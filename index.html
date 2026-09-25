@@ -1298,13 +1298,13 @@
         this.active = false;
 
         // 透視攻城視角
-        this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 800);
+        this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 450);
         this.camera.position.set(0, 19, 24);
         this.camera.lookAt(0, 2, -18);
 
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x131a26);
-        this.scene.fog = new THREE.FogExp2(0x131a26, 0.0035);
+        this.scene.fog = new THREE.FogExp2(0x131a26, 0.007);
 
         // 燈光系統
         const hemi = new THREE.HemisphereLight(0xddeeff, 0x112233, 0.9);
@@ -1315,12 +1315,12 @@
         this.scene.add(dir);
 
         this.trackWidth = 16;
-        this.trackLength = 2600; // 擴充 10 倍長度！ // 延長通道以容納完整關卡歷程
+        this.trackLength = 880; // 縮短至 1/3 精華緊湊長度！
         this.createSiegeCorridor();
 
         // 軍團狀態
-        this.armyCount = 8; // 開局 6 隻微型兵力！
-        this.maxEverArmy = 8;
+        this.armyCount = 12; // 開局 12 隻弓手！ // 開局 6 隻微型兵力！
+        this.maxEverArmy = 12;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
         this.soldiers = [];
@@ -1438,8 +1438,8 @@
         this.reviveNotice.style.display = 'none';
 
         // 1. 開局微型兵力：6 隻！
-        this.armyCount = 8;
-        this.maxEverArmy = 8;
+        this.armyCount = 12; // 開局 12 隻弓手！
+        this.maxEverArmy = 12;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
         this.weaponBuff = { type: 'normal', duration: 0, ammo: 0, name: '普通短弓' };
@@ -1519,122 +1519,99 @@
 
       buildStageProgress() {
         // ==========================================
-        // 超高密度戰場！海量怪物全員主動衝殺 + 加減乘除四則運算抉擇門
+        // 精華緊湊 1/3 關卡 (Z: 0 ~ -380)，平滑階梯式逐步變難
         // ==========================================
         let z = -12;
 
-        // 【第 1 篇：前哨突圍】
-        this.spawnMobBatch(6, z, 'normal', 30, 0.18); z -= 10;
+        // 【階段 1：新手熱身 (入門難度)】
+        // 敵人速度慢 (0.08)、血量低 (18~20 HP)
+        this.spawnMobBatch(3, z, 'normal', 18, 0.08); z -= 10;
         this.spawnPickups(z); z -= 8;
-        this.spawnMobBatch(8, z, 'fast', 25, 0.26); z -= 12;
-        this.spawnPickups(z); z -= 10;
+        this.spawnMobBatch(4, z, 'normal', 22, 0.09); z -= 10;
+        this.spawnPickups(z); z -= 8;
 
-        // 門 1: 【+6 士兵】 vs 【×2 翻倍】(帶 150HP 玻璃球考驗火力)
+        // 門 1: 兵力翻倍！爽快入門
         this.createDecisionPoint(z, {
-          left: { type: 'add_soldier', val: 6, text: '+6 士兵' },
-          right: { type: 'weapon_orb', hp: 150, weapon: 'rapid', text: '連發弓 (150 HP)' }
+          left: { type: 'mult_soldier', val: 2, text: '×2 翻倍！' },
+          right: { type: 'weapon_orb', hp: 90, weapon: 'rapid', text: '連發弓 (90 HP)' }
         });
         z -= 18;
 
-        for (let i = 0; i < 4; i++) {
-          this.spawnMobBatch(8 + i * 2, z, 'normal', 35, 0.18); z -= 10;
-          this.spawnPickups(z); z -= 8;
-          this.spawnMobBatch(4 + i, z, 'shield', 120, 0.14); z -= 10;
-          this.spawnPickups(z); z -= 8;
-        }
+        // 【階段 2：小試身手 (普通難度)】
+        // 開始出現少量盾兵與疾跑兵，小怪血量 30~35 HP，移速 0.12
+        this.spawnMobBatch(6, z, 'normal', 28, 0.11); z -= 11;
+        this.spawnPickups(z); z -= 8;
+        this.spawnMobBatch(2, z, 'shield', 80, 0.09); z -= 11;
+        this.spawnPickups(z); z -= 8;
+        this.spawnMobBatch(5, z, 'fast', 25, 0.16); z -= 12;
 
-        // 門 2: 【×2 兵力暴增】 vs 【-4 陷阱門】（考驗走位避坑！）
+        // 門 2: 穩健增兵 vs 貫穿強弩
         this.createDecisionPoint(z, {
-          left: { type: 'mult_soldier', val: 2, text: '×2 翻倍' },
-          right: { type: 'sub_soldier', val: 4, text: '-4 陷阱！' }
+          left: { type: 'add_soldier', val: 8, text: '+8 弓手' },
+          right: { type: 'weapon_orb', hp: 150, weapon: 'pierce', text: '貫穿強弩 (150 HP)' }
         });
         z -= 20;
 
-        this.spawnMobBatch(12, z, 'fast', 35, 0.28); z -= 12;
-        this.spawnPickups(z); z -= 10;
-
-        // ⚔️ 小 BOSS 1：【狂暴獵豹·先鋒官】(極速大步衝殺！4000 HP，移動速度 0.22)
-        this.spawnActiveMiniBoss(z, 'leopard', 4000, "⚡ 狂暴獵豹·先鋒官", 0.22);
+        // ⚔️ 小 BOSS 1：【狂暴獵豹·先鋒官】(平滑血量 1500 HP，移速 0.14)
+        this.spawnActiveMiniBoss(z, 'leopard', 1500, "⚡ 獵豹先鋒·小BOSS", 0.14);
         z -= 22;
 
-        this.spawnPickups(z); z -= 10;
-        this.spawnMobBatch(14, z, 'normal', 45, 0.18); z -= 12;
+        this.spawnPickups(z); z -= 8;
 
-        // 門 3: 【+15 士兵】 vs 【貫穿強弩 (300 HP)】
+        // 【階段 3：中堅防線 (進階挑戰)】
+        // 敵兵數量增加，血量提升至 45~50 HP，移速 0.14
+        for (let i = 0; i < 3; i++) {
+          this.spawnMobBatch(8 + i * 2, z, 'normal', 40, 0.13); z -= 11;
+          this.spawnPickups(z); z -= 8;
+          this.spawnMobBatch(3 + i, z, 'shield', 120, 0.10); z -= 11;
+          this.spawnPickups(z); z -= 8;
+        }
+
+        // 門 3: ×2 翻倍 vs ÷2 陷阱門（注意走位！）
         this.createDecisionPoint(z, {
-          left: { type: 'add_soldier', val: 15, text: '+15 弓手' },
-          right: { type: 'weapon_orb', hp: 300, weapon: 'pierce', text: '貫穿強弩 (300 HP)' }
+          left: { type: 'mult_soldier', val: 2, text: '×2 暴增' },
+          right: { type: 'div_soldier', val: 2, text: '÷2 陷阱' }
         });
         z -= 20;
 
-        // 【第 2 篇：要塞重盾兵團】
-        for (let i = 0; i < 6; i++) {
-          this.spawnMobBatch(12 + i * 3, z, 'normal', 55, 0.19); z -= 11;
-          this.spawnPickups(z); z -= 9;
-          this.spawnMobBatch(6 + i * 2, z, 'shield', 180, 0.15); z -= 11;
-          this.spawnPickups(z); z -= 9;
-        }
+        this.spawnMobBatch(10, z, 'fast', 35, 0.18); z -= 12;
+        this.spawnPickups(z); z -= 8;
 
-        // 門 4: 【×3 奇蹟暴兵】 vs 【÷2 懲罰門】（嚴格走位）
-        this.createDecisionPoint(z, {
-          left: { type: 'mult_soldier', val: 3, text: '×3 暴兵！' },
-          right: { type: 'div_soldier', val: 2, text: '÷2 減半！' }
-        });
-        z -= 22;
-
-        this.spawnMobBatch(18, z, 'fast', 50, 0.28); z -= 12;
-        this.spawnPickups(z); z -= 10;
-
-        // ⚔️ 小 BOSS 2：【崩山狂牛·先鋒官】(重甲衝鋒！8500 HP，移動速度 0.18)
-        this.spawnActiveMiniBoss(z, 'bull', 8500, "🔥 崩山狂牛·先鋒官", 0.18);
+        // ⚔️ 小 BOSS 2：【崩山狂牛·先鋒官】(血量 2800 HP，重步逼近 0.12)
+        this.spawnActiveMiniBoss(z, 'bull', 2800, "🔥 崩山狂牛·小BOSS", 0.12);
         z -= 24;
 
-        this.spawnPickups(z); z -= 10;
+        this.spawnPickups(z); z -= 8;
 
-        // 門 5: 【+25 士兵】 vs 【焚天烈焰箭 (450 HP)】
+        // 門 4: +20 士兵 vs 烈焰神火
         this.createDecisionPoint(z, {
-          left: { type: 'add_soldier', val: 25, text: '+25 勇士' },
-          right: { type: 'weapon_orb', hp: 450, weapon: 'fire', text: '焚天烈焰 (450 HP)' }
+          left: { type: 'add_soldier', val: 20, text: '+20 勇士' },
+          right: { type: 'weapon_orb', hp: 220, weapon: 'fire', text: '焚天烈焰 (220 HP)' }
         });
-        z -= 22;
+        z -= 20;
 
-        // 【第 3 篇：幽冥蛇潮】
-        for (let i = 0; i < 7; i++) {
-          this.spawnMobBatch(16 + i * 3, z, 'fast', 60, 0.29); z -= 11;
-          this.spawnPickups(z); z -= 9;
-          this.spawnMobBatch(8 + i * 2, z, 'shield', 220, 0.16); z -= 11;
-          this.spawnPickups(z); z -= 9;
+        // 【階段 4：王城精銳 (高潮階段)】
+        for (let i = 0; i < 3; i++) {
+          this.spawnMobBatch(12 + i * 2, z, 'normal', 50, 0.15); z -= 11;
+          this.spawnPickups(z); z -= 8;
+          this.spawnMobBatch(5 + i, z, 'fast', 40, 0.20); z -= 11;
+          this.spawnPickups(z); z -= 8;
         }
 
-        // ⚔️ 小 BOSS 3：【幽冥青蛇·大護法】(巨蟒大步前撲！13500 HP，移動速度 0.20)
-        this.spawnActiveMiniBoss(z, 'snake', 13500, "🐍 幽冥青蛇·大護法", 0.20);
-        z -= 26;
+        // ⚔️ 小 BOSS 3：【幽冥青蛇·大護法】(血量 4200 HP，蛇形游動 0.14)
+        this.spawnActiveMiniBoss(z, 'snake', 4200, "🐍 幽冥青蛇·小BOSS", 0.14);
+        z -= 25;
 
-        this.spawnPickups(z); z -= 10;
+        this.spawnPickups(z); z -= 8;
 
-        // 門 6: 【×2 翻倍衝鋒】 vs 【-10 折損】
+        // 決戰衝鋒門
         this.createDecisionPoint(z, {
-          left: { type: 'mult_soldier', val: 2, text: '×2 翻倍' },
-          right: { type: 'sub_soldier', val: 10, text: '-10 陷阱' }
+          left: { type: 'mult_soldier', val: 2, text: '全軍翻倍 ×2' },
+          right: { type: 'weapon_orb', hp: 300, weapon: 'rapid', text: '神弩疾風 (300 HP)' }
         });
-        z -= 22;
+        z -= 28;
 
-        // 【第 4 篇：皇城萬軍死斗】
-        for (let i = 0; i < 8; i++) {
-          this.spawnMobBatch(20 + i * 4, z, 'normal', 75, 0.20); z -= 12;
-          this.spawnPickups(z); z -= 9;
-          this.spawnMobBatch(10 + i * 2, z, 'fast', 65, 0.30); z -= 12;
-          this.spawnPickups(z); z -= 9;
-        }
-
-        // 決戰前終極大陣門
-        this.createDecisionPoint(z, {
-          left: { type: 'add_soldier', val: 50, text: '大軍集結 +50' },
-          right: { type: 'weapon_orb', hp: 1200, weapon: 'rapid', text: '天劫滅世神弩 (1200 HP)' }
-        });
-        z -= 35;
-
-        // 👑 最終大 BOSS 降臨（超厚實巨獸！）
+        // 👑 決戰壓軸大 BOSS 登場！
         this.prepareFinalBoss(z);
       }
 
@@ -1938,22 +1915,22 @@
         let bossName = "狂暴獵豹 大BOSS";
         if (this.bossType === 'leopard') {
           this.boss = createLeopardBossModel();
-          this.bossMaxHp = 25000; // 超長厚實血條！
+          this.bossMaxHp = 6800; // 適中痛快血條
           bossName = "👑 萬獸主宰·狂暴獵豹 (大BOSS)";
         } else if (this.bossType === 'bull') {
           this.boss = createBigBullBossModel();
-          this.bossMaxHp = 32000; // 超長厚實血條！
+          this.bossMaxHp = 8500;
           bossName = "👑 崩山撼地·狂暴戰牛 (大BOSS)";
         } else {
           this.boss = createGreenSnakeBossModel();
-          this.bossMaxHp = 28000; // 超長厚實血條！
+          this.bossMaxHp = 7600;
           bossName = "👑 噬天化龍·幽冥青蛇 (大BOSS)";
         }
         this.bossHp = this.bossMaxHp;
         this.bossNameText.textContent = bossName;
         this.boss.position.set(0, 0, zPos);
         this.bossZ = zPos;
-        this.boss.scale.multiplyScalar(1.4); // 大 Boss 更加遮天蔽日
+        this.boss.scale.multiplyScalar(1.3);
         this.scene.add(this.boss);
       }
 
@@ -1961,7 +1938,7 @@
         // 依武器決定射擊模式
         let arrowCount = Math.min(Math.floor(this.armyCount * 0.7) + 3, 36);
         let arrowColor = 0x38bdf8;
-        let damage = 25;
+        let damage = 35; // 基礎箭矢傷害提升
         let isPierce = false;
         let isFire = false;
 
@@ -2195,7 +2172,7 @@
 
           // 只有當敵怪正面衝撞進軍團方陣半徑內
           if (distZ < 1.0 && distX < armyRadius + 0.5) {
-            const lost = e.isMiniBoss ? 3 : (e.type === 'shield' ? 2 : 1);
+            const lost = e.isMiniBoss ? 2 : 1;
             this.armyCount = Math.max(0, this.armyCount - lost);
             this.scene.remove(e.group);
             this.enemies.splice(i, 1);
