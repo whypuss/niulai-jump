@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>牛來跳一跳 (Niulai Jump) - Three.js 3D 微信跳一跳復刻版</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #cdd9c7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* 頂部分數與儀表盤 */
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      z-index: 10;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      width: 100%;
+    }
+    .score-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .score-num {
+      font-size: 64px;
+      font-weight: 900;
+      color: #333d29;
+      line-height: 1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      font-family: "Arial Rounded MT Bold", -apple-system, sans-serif;
+    }
+    .high-score {
+      font-size: 14px;
+      font-weight: 700;
+      color: #6c7562;
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+    }
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #3b4233;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn:hover {
+      background: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    }
+    .action-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* 遊戲玩法提示 */
+    .instruction-hint {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 蓄力進度條（跳一跳經典光條反饋） */
+    .charge-meter {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, 40px);
+      width: 120px;
+      height: 8px;
+      background: rgba(0,0,0,0.15);
+      border-radius: 4px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .charge-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #ffc107, #ff5722);
+      border-radius: 4px;
+      transition: width 0.05s linear;
+    }
+
+    /* 完美中心加分浮動文字 */
+    .score-popup {
+      position: absolute;
+      color: #ff5722;
+      font-size: 32px;
+      font-weight: 900;
+      pointer-events: none;
+      animation: floatUp 0.8s ease-out forwards;
+      text-shadow: 0 2px 4px rgba(255,255,255,0.8);
+      font-family: "Arial Rounded MT Bold", sans-serif;
+    }
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+      30% { opacity: 1; transform: translate(-50%, -30px) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -70px) scale(1); }
+    }
+
+    /* 結束畫面彈窗 */
+    #game-over-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: #ffffff;
+      width: 90%;
+      max-width: 360px;
+      border-radius: 28px;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes modalPop {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .modal-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #2b3324;
+      margin-bottom: 8px;
+    }
+    .modal-avatar {
+      font-size: 54px;
+      margin: 10px 0;
+      animation: bounce 1.5s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .final-score-label {
+      font-size: 13px;
+      color: #889280;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .final-score-val {
+      font-size: 56px;
+      font-weight: 900;
+      color: #ff5722;
+      line-height: 1.1;
+      margin-bottom: 6px;
+      font-family: "Arial Rounded MT Bold", sans-serif;
+    }
+    .best-score-val {
+      font-size: 14px;
+      color: #555e4e;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .restart-btn {
+      background: #4caf50;
+      color: #ffffff;
+      border: none;
+      border-radius: 18px;
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(76, 175, 80, 0.35);
+      transition: all 0.15s ease;
+    }
+    .restart-btn:hover {
+      background: #43a047;
+      transform: translateY(-2px);
+    }
+    .restart-btn:active {
+      transform: translateY(1px);
+    }
+    .export-btn-modal {
+      background: #f1f4ee;
+      color: #444f3b;
+      border: none;
+      border-radius: 18px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .export-btn-modal:hover {
+      background: #e3e8de;
+    }
+
+    /* 角色預覽與切換面板 */
+    .character-tag {
+      position: absolute;
+      top: 100px;
+      left: 24px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(8px);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a5440;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .character-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffb300;
+    }
+  </style>
+  <!-- 優先載入本地離線資源，極速秒開無延遲 -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/GLTFExporter.js"></script>
+  <!-- CDN 備用 Fallback -->
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div id="ui-overlay">
+    <div class="header-bar">
+      <div class="score-container">
+        <div class="score-num" id="current-score">0</div>
+        <div class="high-score" id="high-score-display">最高紀錄: 0</div>
+      </div>
+      <div class="top-actions">
+        <a class="action-btn" href="niulai-jump.apk" download="niulai-jump.apk" style="text-decoration:none;" title="下載牛來跳一跳 Android APK">
+          📱 下載 APK
+        </a>
+        <button class="action-btn" id="btn-export-glb" title="導出牛來 3D 模型 (.glb)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          導出 .GLB
+        </button>
+        <button class="action-btn" id="btn-sound-toggle" title="開關音效">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <div class="character-tag">
+      <div class="character-dot"></div>
+      主角：牛來 (經典黃牛造型 3D)
+    </div>
+
+    <div class="charge-meter" id="charge-meter">
+      <div class="charge-fill" id="charge-fill"></div>
+    </div>
+
+    <div class="instruction-hint" id="instruction-hint">
+      <span>👆</span> 長按螢幕蓄力，鬆開放手跳躍
+    </div>
+  </div>
+
+  <!-- 結算彈窗 -->
+  <div id="game-over-modal">
+    <div class="modal-card">
+      <div class="modal-title">哎呀，踩空了！</div>
+      <div class="modal-avatar">🐮</div>
+      <div class="final-score-label">本次得分</div>
+      <div class="final-score-val" id="modal-score">0</div>
+      <div class="best-score-val" id="modal-best">歷史最佳: 0</div>
+      <div class="btn-group">
+        <button class="restart-btn" id="btn-restart">再跳一次 🚀</button>
+        <button class="export-btn-modal" id="btn-modal-export">📦 下載「牛來」3D 模型 (.glb)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. 音效合成系統 (Web Audio API)
+    // ==========================================
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.chargeOsc = null;
+        this.chargeGain = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playChargeStart() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          this.stopCharge();
+          this.chargeOsc = this.ctx.createOscillator();
+          this.chargeGain = this.ctx.createGain();
+          this.chargeOsc.type = 'sine';
+          this.chargeOsc.frequency.setValueAtTime(140, this.ctx.currentTime);
+          this.chargeOsc.frequency.exponentialRampToValueAtTime(450, this.ctx.currentTime + 1.8);
+          this.chargeGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+          this.chargeGain.gain.linearRampToValueAtTime(0.2, this.ctx.currentTime + 1.5);
+          this.chargeOsc.connect(this.chargeGain);
+          this.chargeGain.connect(this.ctx.destination);
+          this.chargeOsc.start();
+        } catch(e) {}
+      }
+      stopCharge() {
+        if (this.chargeOsc) {
+          try {
+            this.chargeOsc.stop();
+            this.chargeOsc.disconnect();
+          } catch(e) {}
+          this.chargeOsc = null;
+        }
+      }
+      playJump() {
+        this.stopCharge();
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(620, this.ctx.currentTime + 0.22);
+          gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.25);
+        } catch(e) {}
+      }
+      playLand() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(130, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.15);
+        } catch(e) {}
+      }
+      playPerfect(combo = 1) {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const baseFreq = Math.min(523.25 * Math.pow(1.15, combo - 1), 1200); // 隨 combo 升高
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
+          osc.frequency.setValueAtTime(baseFreq * 1.5, this.ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.22, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.45);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.45);
+        } catch(e) {}
+      }
+      playFall() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(350, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.6);
+          gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.65);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.65);
+        } catch(e) {}
+      }
+    }
+    const sound = new SoundFX();
+
+    // ==========================================
+    // 2. 「牛來」高精緻度 3D 角色模型構建工廠
+    // ==========================================
+    // 參照用戶圖片 2：經典黃牛人偶外型
+    // - 土黃色微胖圓滾身軀
+    // - 突出肉粉紫色大厚嘴吻部 (Muzzle)
+    // - 灰黑後翹牛角 + 耷拉下垂牛耳
+    // - 標誌性「厭世蔑視死魚眼」與微挑黑粗眉
+    // - 短手臂配分趾手掌，短粗腿配牛蹄，身後小牛尾巴
+    function createNiulaiCowModel() {
+      const cowRoot = new THREE.Group();
+      cowRoot.name = "Niulai_Cow";
+
+      // 材質調色盤（完全對齊第二張圖片配色）
+      const yellowFurMat = new THREE.MeshStandardMaterial({
+        color: 0xe0a62f, // 暖芥末黃/土黃
+        roughness: 0.82,
+        metalness: 0.05
+      });
+      const snoutMat = new THREE.MeshStandardMaterial({
+        color: 0xc2a1af, // 肉粉紫灰色吻部
+        roughness: 0.55,
+        metalness: 0.02
+      });
+      const hornMat = new THREE.MeshStandardMaterial({
+        color: 0x3a3536, // 深灰黑牛角
+        roughness: 0.5,
+        metalness: 0.15
+      });
+      const hoofMat = new THREE.MeshStandardMaterial({
+        color: 0xd2cbd2, // 蹄部淺灰白色
+        roughness: 0.65,
+        metalness: 0.08
+      });
+      const darkDetailMat = new THREE.MeshStandardMaterial({
+        color: 0x221e1e, // 鼻孔與暗部
+        roughness: 0.9
+      });
+      const eyeWhiteMat = new THREE.MeshStandardMaterial({
+        color: 0xf5efe8,
+        roughness: 0.3
+      });
+      const eyePupilMat = new THREE.MeshStandardMaterial({
+        color: 0x161312,
+        roughness: 0.4
+      });
+      const eyeBrowMat = new THREE.MeshStandardMaterial({
+        color: 0x1a1716,
+        roughness: 0.7
+      });
+      const innerEarMat = new THREE.MeshStandardMaterial({
+        color: 0xd9b3bd,
+        roughness: 0.7
+      });
+
+      // ------------------------------------
+      // 2.1 軀幹 (Body / Torso) - 微胖呆萌
+      // ------------------------------------
+      const bodyGroup = new THREE.Group();
+      bodyGroup.name = "Body_Group";
+
+      // 肚子/身體主體（帶微胖肚腩的膠囊狀幾何）
+      const bodyGeo = new THREE.CylinderGeometry(0.72, 0.82, 1.45, 24);
+      const bodyMesh = new THREE.Mesh(bodyGeo, yellowFurMat);
+      bodyMesh.position.y = 1.45;
+      bodyMesh.castShadow = true;
+      bodyMesh.receiveShadow = true;
+      bodyGroup.add(bodyMesh);
+
+      // 肚子稍微前凸的豐滿弧度
+      const bellyGeo = new THREE.SphereGeometry(0.78, 20, 16);
+      const bellyMesh = new THREE.Mesh(bellyGeo, yellowFurMat);
+      bellyMesh.scale.set(1.0, 0.92, 1.14);
+      bellyMesh.position.set(0, 1.36, 0.08);
+      bellyMesh.castShadow = true;
+      bodyGroup.add(bellyMesh);
+
+      // ------------------------------------
+      // 2.2 頭部 (Head)
+      // ------------------------------------
+      const headGroup = new THREE.Group();
+      headGroup.name = "Head_Group";
+      headGroup.position.set(0, 2.35, 0.05);
+
+      // 大頭本體（飽滿的大圓頭）
+      const headGeo = new THREE.SphereGeometry(0.76, 24, 20);
+      const headMesh = new THREE.Mesh(headGeo, yellowFurMat);
+      headMesh.scale.set(1.02, 1.05, 1.05);
+      headMesh.castShadow = true;
+      headGroup.add(headMesh);
+
+      // ------------------------------------
+      // 2.3 標誌性大厚嘴唇吻部 (Muzzle / Snout)
+      // ------------------------------------
+      const snoutGroup = new THREE.Group();
+      snoutGroup.position.set(0, -0.14, 0.58);
+
+      const snoutGeo = new THREE.SphereGeometry(0.52, 20, 16);
+      const snoutMesh = new THREE.Mesh(snoutGeo, snoutMat);
+      snoutMesh.scale.set(1.15, 0.72, 1.05);
+      snoutMesh.castShadow = true;
+      snoutGroup.add(snoutMesh);
+
+      // 上唇與鼻孔上方飽滿凸起
+      const upperLipGeo = new THREE.CylinderGeometry(0.46, 0.52, 0.28, 16);
+      const upperLipMesh = new THREE.Mesh(upperLipGeo, snoutMat);
+      upperLipMesh.rotation.x = Math.PI / 10;
+      upperLipMesh.position.set(0, 0.08, 0.12);
+      upperLipMesh.castShadow = true;
+      snoutGroup.add(upperLipMesh);
+
+      // 鼻孔 (Nostrils) - 左右一對微凹陷暗灰黑橢圓
+      for (let side of [-1, 1]) {
+        const nostrilGeo = new THREE.SphereGeometry(0.065, 10, 8);
+        const nostrilMesh = new THREE.Mesh(nostrilGeo, darkDetailMat);
+        nostrilMesh.scale.set(1.4, 0.8, 1.0);
+        nostrilMesh.position.set(side * 0.16, 0.12, 0.46);
+        snoutGroup.add(nostrilMesh);
+      }
+
+      // 下唇微凹線條
+      const lowerLipGeo = new THREE.CylinderGeometry(0.36, 0.32, 0.15, 12);
+      const lowerLipMesh = new THREE.Mesh(lowerLipGeo, snoutMat);
+      lowerLipMesh.position.set(0, -0.18, 0.18);
+      snoutGroup.add(lowerLipMesh);
+
+      headGroup.add(snoutGroup);
+
+      // ------------------------------------
+      // 2.4 面部靈魂：純 3D 厭世蔑視「死魚眼」與黑挑眉
+      // ------------------------------------
+      for (let side of [-1, 1]) {
+        const eyeGroup = new THREE.Group();
+        eyeGroup.position.set(side * 0.32, 0.22, 0.65);
+
+        // 扁橢圓米白眼球
+        const eyeballGeo = new THREE.SphereGeometry(0.18, 16, 12);
+        const eyeball = new THREE.Mesh(eyeballGeo, eyeWhiteMat);
+        eyeball.scale.set(1.25, 0.85, 0.6);
+        eyeball.castShadow = true;
+        eyeGroup.add(eyeball);
+
+        // 黑色小瞳孔（微斜視蔑視眼神）
+        const pupilGeo = new THREE.SphereGeometry(0.075, 12, 10);
+        const pupil = new THREE.Mesh(pupilGeo, eyePupilMat);
+        pupil.position.set(side * 0.04, 0.01, 0.09);
+        eyeGroup.add(pupil);
+
+        // 靈魂死魚眼皮：半球殼半耷拉遮住上眼球 40%
+        const eyelidGeo = new THREE.SphereGeometry(0.19, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2.2);
+        const eyelid = new THREE.Mesh(eyelidGeo, yellowFurMat);
+        eyelid.scale.set(1.28, 0.88, 0.62);
+        eyelid.rotation.x = Math.PI / 8;
+        eyelid.position.set(0, 0.04, 0.02);
+        eyelid.castShadow = true;
+        eyeGroup.add(eyelid);
+
+        // 黑色挑眉（微挑帶有傲慢諷刺喜感）
+        const browGeo = new THREE.BoxGeometry(0.38, 0.08, 0.08);
+        const brow = new THREE.Mesh(browGeo, eyeBrowMat);
+        brow.position.set(0, 0.22, 0.05);
+        brow.rotation.z = side * -0.22;
+        brow.rotation.y = side * 0.15;
+        brow.castShadow = true;
+        eyeGroup.add(brow);
+
+        headGroup.add(eyeGroup);
+      }
+
+      // ------------------------------------
+      // 2.5 牛角 (Horns) - 深灰黑彎角
+      // ------------------------------------
+      for (let side of [-1, 1]) {
+        const hornGroup = new THREE.Group();
+        hornGroup.position.set(side * 0.48, 0.62, -0.05);
+
+        // 圓錐彎曲向上向後微翹
+        const hornGeo = new THREE.ConeGeometry(0.14, 0.58, 16);
+        const hornMesh = new THREE.Mesh(hornGeo, hornMat);
+        hornMesh.position.y = 0.26;
+        hornMesh.rotation.z = side * -0.55; // 往兩側分開
+        hornMesh.rotation.x = -0.35;        // 往後微彎
+        hornMesh.castShadow = true;
+        hornGroup.add(hornMesh);
+
+        // 牛角根部底座圓環
+        const baseRingGeo = new THREE.CylinderGeometry(0.15, 0.16, 0.08, 12);
+        const baseRingMesh = new THREE.Mesh(baseRingGeo, hornMat);
+        baseRingMesh.position.set(0, 0.02, 0);
+        hornGroup.add(baseRingMesh);
+
+        headGroup.add(hornGroup);
+      }
+
+      // ------------------------------------
+      // 2.6 牛耳朵 (Ears) - 向兩側斜下方微垂
+      // ------------------------------------
+      for (let side of [-1, 1]) {
+        const earGroup = new THREE.Group();
+        earGroup.position.set(side * 0.68, 0.42, -0.1);
+
+        const earGeo = new THREE.SphereGeometry(0.28, 16, 12);
+        const earMesh = new THREE.Mesh(earGeo, yellowFurMat);
+        earMesh.scale.set(0.9, 0.4, 0.25);
+        earMesh.rotation.z = side * 0.35;
+        earMesh.rotation.y = side * 0.25;
+        earMesh.castShadow = true;
+        earGroup.add(earMesh);
+
+        // 內耳粉色凹陷
+        const innerEarGeo = new THREE.SphereGeometry(0.2, 12, 10);
+        const innerEarMat = new THREE.MeshStandardMaterial({ color: 0xd9b3bd, roughness: 0.7 });
+        const innerEarMesh = new THREE.Mesh(innerEarGeo, innerEarMat);
+        innerEarMesh.scale.set(0.8, 0.3, 0.15);
+        innerEarMesh.position.set(0, 0, 0.05);
+        earGroup.add(innerEarMesh);
+
+        headGroup.add(earGroup);
+      }
+
+      bodyGroup.add(headGroup);
+
+      // ------------------------------------
+      // 2.7 手臂與手 (Arms & Hands)
+      // ------------------------------------
+      const arms = [];
+      for (let side of [-1, 1]) {
+        const armGroup = new THREE.Group();
+        armGroup.position.set(side * 0.88, 1.75, 0);
+
+        // 黃色圓臂
+        const armGeo = new THREE.CylinderGeometry(0.22, 0.2, 0.75, 16);
+        const armMesh = new THREE.Mesh(armGeo, yellowFurMat);
+        armMesh.position.y = -0.35;
+        armMesh.rotation.z = side * -0.15;
+        armMesh.castShadow = true;
+        armGroup.add(armMesh);
+
+        // 淺灰白手掌/分趾牛蹄手
+        const handGeo = new THREE.BoxGeometry(0.28, 0.24, 0.28);
+        const handMesh = new THREE.Mesh(handGeo, hoofMat);
+        handMesh.position.set(0, -0.78, 0);
+        handMesh.castShadow = true;
+        armGroup.add(handMesh);
+
+        bodyGroup.add(armGroup);
+        arms.push(armGroup);
+      }
+
+      // ------------------------------------
+      // 2.8 雙腿與分趾牛蹄 (Legs & Hooves)
+      // ------------------------------------
+      for (let side of [-1, 1]) {
+        const legGroup = new THREE.Group();
+        legGroup.position.set(side * 0.36, 0.75, 0);
+
+        // 黃色粗短腿
+        const legGeo = new THREE.CylinderGeometry(0.26, 0.28, 0.65, 16);
+        const legMesh = new THREE.Mesh(legGeo, yellowFurMat);
+        legMesh.position.y = -0.22;
+        legMesh.castShadow = true;
+        legGroup.add(legMesh);
+
+        // 灰白分趾牛蹄腳
+        const hoofGeo = new THREE.BoxGeometry(0.36, 0.22, 0.48);
+        const hoofMesh = new THREE.Mesh(hoofGeo, hoofMat);
+        hoofMesh.position.set(0, -0.62, 0.06);
+        hoofMesh.castShadow = true;
+        legGroup.add(hoofMesh);
+
+        // 牛蹄中間的分裂槽
+        const splitGeo = new THREE.BoxGeometry(0.04, 0.24, 0.25);
+        const splitMesh = new THREE.Mesh(splitGeo, darkDetailMat);
+        splitMesh.position.set(0, -0.62, 0.18);
+        legGroup.add(splitMesh);
+
+        bodyGroup.add(legGroup);
+      }
+
+      // ------------------------------------
+      // 2.9 牛尾巴 (Tail)
+      // ------------------------------------
+      const tailGroup = new THREE.Group();
+      tailGroup.position.set(0, 0.9, -0.75);
+
+      const tailGeo = new THREE.CylinderGeometry(0.05, 0.04, 0.45, 8);
+      const tailMesh = new THREE.Mesh(tailGeo, yellowFurMat);
+      tailMesh.position.set(0, -0.2, -0.1);
+      tailMesh.rotation.x = -0.55;
+      tailGroup.add(tailMesh);
+
+      // 尾尖深色毛球
+      const tuftGeo = new THREE.SphereGeometry(0.09, 10, 8);
+      const tuftMesh = new THREE.Mesh(tuftGeo, darkDetailMat);
+      tuftMesh.position.set(0, -0.42, -0.22);
+      tailGroup.add(tuftMesh);
+
+      bodyGroup.add(tailGroup);
+
+      // 整體掛載
+      cowRoot.add(bodyGroup);
+      cowRoot.scale.set(0.68, 0.68, 0.68); // 縮放到跳一跳小棋子合適比例
+
+      // 附加動畫控制引號
+      cowRoot.userData = {
+        bodyGroup: bodyGroup,
+        headGroup: headGroup,
+        arms: arms,
+        tailGroup: tailGroup,
+        originalScaleY: 0.68
+      };
+
+      return cowRoot;
+    }
+
+    // ==========================================
+    // 3. 多元化方塊產生系統 (跳一跳特色幾何方塊)
+    // ==========================================
+    // 包含：圖一經典粉紅禮物盒、白色表情萌物盒、灰色小白點盒、綠色小圓柱等
+    class BlockFactory {
+      constructor() {
+        this.blockTypes = ['pink_gift', 'grey_dot', 'white_kitty', 'green_cylinder', 'wood_crate', 'gold_brick'];
+      }
+
+      createRandomBlock(index = 0) {
+        const type = index === 0 ? 'pink_gift' : this.blockTypes[Math.floor(Math.random() * this.blockTypes.length)];
+        const group = new THREE.Group();
+        group.name = `Block_${index}_${type}`;
+
+        const width = 2.4;
+        const height = 1.4;
+        const depth = 2.4;
+
+        if (type === 'pink_gift') {
+          // 圖一左方粉色禮品方塊：粉紅底色 + 十字緞帶 + 金色中心
+          const boxMat = new THREE.MeshStandardMaterial({ color: 0xf8b4be, roughness: 0.45 });
+          const ribbonMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+          const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), boxMat);
+          mainBox.castShadow = true;
+          mainBox.receiveShadow = true;
+          group.add(mainBox);
+
+          // 十字白色緞帶
+          const ribbonX = new THREE.Mesh(new THREE.BoxGeometry(width + 0.02, height + 0.02, 0.45), ribbonMat);
+          const ribbonZ = new THREE.Mesh(new THREE.BoxGeometry(0.45, height + 0.02, depth + 0.02), ribbonMat);
+          ribbonX.receiveShadow = true;
+          ribbonZ.receiveShadow = true;
+          group.add(ribbonX);
+          group.add(ribbonZ);
+
+          // 頂部小蝴蝶結/中心白點
+          const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 16), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+          dot.position.y = height / 2 + 0.025;
+          group.add(dot);
+
+        } else if (type === 'grey_dot') {
+          // 圖一上方灰黑方塊：灰色分層 + 頂部中心小白點 (+2 分彩蛋)
+          const baseMat = new THREE.MeshStandardMaterial({ color: 0x6e7681, roughness: 0.6 });
+          const stripeMat = new THREE.MeshStandardMaterial({ color: 0x959da5, roughness: 0.5 });
+          const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), baseMat);
+          mainBox.castShadow = true;
+          mainBox.receiveShadow = true;
+          group.add(mainBox);
+
+          // 腰線淺色橫條
+          const stripe = new THREE.Mesh(new THREE.BoxGeometry(width + 0.02, 0.4, depth + 0.02), stripeMat);
+          group.add(stripe);
+
+          // 頂面中心小白點
+          const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          dot.position.y = height / 2 + 0.025;
+          group.add(dot);
+
+        } else if (type === 'white_kitty') {
+          // 圖一右下角白色萌物表情方塊
+          const whiteMat = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.4 });
+          const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), whiteMat);
+          mainBox.castShadow = true;
+          mainBox.receiveShadow = true;
+          group.add(mainBox);
+
+          // 萌系臉龐貼圖
+          const canvas = document.createElement('canvas');
+          canvas.width = 256; canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fafafa';
+          ctx.fillRect(0, 0, 256, 256);
+          // 眼睛
+          ctx.fillStyle = '#222';
+          ctx.beginPath(); ctx.arc(80, 110, 14, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(176, 110, 14, 0, Math.PI * 2); ctx.fill();
+          // 腮紅
+          ctx.fillStyle = '#ffb3ba';
+          ctx.beginPath(); ctx.arc(55, 140, 18, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(201, 140, 18, 0, Math.PI * 2); ctx.fill();
+          // 貓咪笑嘴
+          ctx.strokeStyle = '#222'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(114, 135, 16, 0.2, Math.PI - 0.2, false);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(142, 135, 16, 0.2, Math.PI - 0.2, false);
+          ctx.stroke();
+
+          const faceTex = new THREE.CanvasTexture(canvas);
+          const faceMat = new THREE.MeshBasicMaterial({ map: faceTex });
+          const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.9, height * 0.9), faceMat);
+          facePlane.position.set(width / 2 + 0.01, 0, 0);
+          facePlane.rotation.y = Math.PI / 2;
+          group.add(facePlane);
+
+        } else if (type === 'green_cylinder') {
+          // 圖一中間偏下綠色矮圓台
+          const greenMat = new THREE.MeshStandardMaterial({ color: 0x48a979, roughness: 0.5 });
+          const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(width * 0.55, width * 0.55, height, 32), greenMat);
+          cylinder.castShadow = true;
+          cylinder.receiveShadow = true;
+          group.add(cylinder);
+
+          // 頂面淺綠環圈
+          const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.6, 24), new THREE.MeshBasicMaterial({ color: 0x66c898, side: THREE.DoubleSide }));
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.y = height / 2 + 0.02;
+          group.add(ring);
+
+        } else if (type === 'wood_crate') {
+          // 經典木箱方塊
+          const woodMat = new THREE.MeshStandardMaterial({ color: 0xc89d6c, roughness: 0.75 });
+          const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), woodMat);
+          mainBox.castShadow = true;
+          mainBox.receiveShadow = true;
+          group.add(mainBox);
+
+          // 邊框深色條
+          const darkWood = new THREE.MeshStandardMaterial({ color: 0x8d6338, roughness: 0.8 });
+          const frame = new THREE.Mesh(new THREE.BoxGeometry(width + 0.02, 0.12, depth + 0.02), darkWood);
+          frame.position.y = height / 2 - 0.06;
+          group.add(frame);
+
+        } else {
+          // 金磚方塊
+          const goldMat = new THREE.MeshStandardMaterial({ color: 0xf5b722, metalness: 0.45, roughness: 0.3 });
+          const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), goldMat);
+          mainBox.castShadow = true;
+          mainBox.receiveShadow = true;
+          group.add(mainBox);
+
+          const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          dot.position.y = height / 2 + 0.02;
+          group.add(dot);
+        }
+
+        // 方塊屬性
+        group.userData = {
+          width: width,
+          height: height,
+          depth: depth,
+          radius: width / 2, // 判定半徑
+          type: type
+        };
+
+        return group;
+      }
+    }
+
+    // ==========================================
+    // 4. 遊戲主控制器 (JumpGame Controller)
+    // ==========================================
+    class JumpGame {
+      constructor() {
+        this.container = document.getElementById('canvas-container');
+        this.scoreEl = document.getElementById('current-score');
+        this.highScoreEl = document.getElementById('high-score-display');
+        this.instructionEl = document.getElementById('instruction-hint');
+        this.chargeMeter = document.getElementById('charge-meter');
+        this.chargeFill = document.getElementById('charge-fill');
+        this.gameOverModal = document.getElementById('game-over-modal');
+        this.modalScore = document.getElementById('modal-score');
+        this.modalBest = document.getElementById('modal-best');
+
+        this.score = 0;
+        this.highScore = parseInt(localStorage.getItem('niulai_jump_best') || '0', 10);
+        this.combo = 0; // 連續命中中心
+
+        // 狀態機: IDLE, CHARGING, JUMPING, LANDED, GAMEOVER
+        this.state = 'IDLE';
+
+        this.chargeStartTime = 0;
+        this.chargeRatio = 0; // 0 ~ 1
+
+        this.blocks = [];
+        this.currentBlockIndex = 0;
+        this.nextDirection = new THREE.Vector3(1, 0, 0); // 隨機 X 或 Z 方向
+
+        this.blockFactory = new BlockFactory();
+
+        this.initThree();
+        this.initLights();
+        this.initCow();
+        this.initFirstBlocks();
+        this.initEvents();
+        this.updateUI();
+
+        this.animate = this.animate.bind(this);
+        requestAnimationFrame(this.animate);
+      }
+
+      initThree() {
+        // 場景
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0xd0dbcc); // 經典跳一跳綠意背景
+        this.scene.fog = new THREE.Fog(0xd0dbcc, 30, 70);
+
+        // 正交相機 (Isometric Camera)
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 11;
+        this.camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 100);
+        
+        // 經典 45度斜俯視角
+        this.camera.position.set(16, 20, 16);
+        this.camera.lookAt(0, 1.5, 0);
+        this.cameraTarget = new THREE.Vector3(0, 1.5, 0);
+
+        // 渲染器
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.container.appendChild(this.renderer.domElement);
+
+        window.addEventListener('resize', () => {
+          const asp = window.innerWidth / window.innerHeight;
+          this.camera.left = -d * asp;
+          this.camera.right = d * asp;
+          this.camera.top = d;
+          this.camera.bottom = -d;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      initLights() {
+        // 環境半球光
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0bba8, 0.65);
+        this.scene.add(hemiLight);
+
+        // 主平行光（柔和投影）
+        this.dirLight = new THREE.DirectionalLight(0xfff8ee, 0.75);
+        this.dirLight.position.set(14, 25, 10);
+        this.dirLight.castShadow = true;
+        this.dirLight.shadow.mapSize.width = 2048;
+        this.dirLight.shadow.mapSize.height = 2048;
+        this.dirLight.shadow.camera.near = 1;
+        this.dirLight.shadow.camera.far = 60;
+        const size = 15;
+        this.dirLight.shadow.camera.left = -size;
+        this.dirLight.shadow.camera.right = size;
+        this.dirLight.shadow.camera.top = size;
+        this.dirLight.shadow.camera.bottom = -size;
+        this.dirLight.shadow.bias = -0.0005;
+        this.scene.add(this.dirLight);
+
+        // 背景柔和補光
+        const fillLight = new THREE.DirectionalLight(0xbad2c5, 0.3);
+        fillLight.position.set(-15, 10, -15);
+        this.scene.add(fillLight);
+      }
+
+      initCow() {
+        this.cow = createNiulaiCowModel();
+        this.scene.add(this.cow);
+      }
+
+      initFirstBlocks() {
+        // 清理現有方塊
+        for (let b of this.blocks) {
+          this.scene.remove(b);
+        }
+        this.blocks = [];
+        this.currentBlockIndex = 0;
+
+        // 第一個起始方塊 (0, 0, 0)
+        const b0 = this.blockFactory.createRandomBlock(0);
+        b0.position.set(0, 0, 0);
+        this.scene.add(b0);
+        this.blocks.push(b0);
+
+        // 小牛站在第一個方塊上
+        const b0Height = b0.userData.height;
+        this.cow.position.set(0, b0Height / 2 + 0.05, 0);
+        this.cow.rotation.set(0, 0, 0);
+        this.cow.scale.set(0.68, 0.68, 0.68);
+
+        // 生成第二個方塊
+        this.spawnNextBlock();
+      }
+
+      spawnNextBlock() {
+        const lastBlock = this.blocks[this.blocks.length - 1];
+        
+        // 跳一跳經典：隨機前進方向，要麼 X 軸（右前），要麼 Z 軸（左前）
+        const isX = Math.random() > 0.5;
+        this.nextDirection = isX ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+
+        // 面向跳躍方向
+        const targetRotY = isX ? 0 : -Math.PI / 2;
+        this.cowTargetRotY = targetRotY;
+
+        // 隨機跳躍距離 (4.2 ~ 7.8 單位)
+        const distance = 4.2 + Math.random() * 3.6;
+        const newPos = lastBlock.position.clone().add(this.nextDirection.clone().multiplyScalar(distance));
+
+        const nextBlock = this.blockFactory.createRandomBlock(this.blocks.length);
+        nextBlock.position.copy(newPos);
+        nextBlock.position.y = -10; // 從下方升起的開場過渡
+        this.scene.add(nextBlock);
+        this.blocks.push(nextBlock);
+
+        // 平滑升起動畫
+        const targetY = 0;
+        const startTime = performance.now();
+        const riseAnim = (now) => {
+          const t = Math.min((now - startTime) / 300, 1);
+          const easeOut = Math.sin((t * Math.PI) / 2);
+          nextBlock.position.y = -10 * (1 - easeOut) + targetY * easeOut;
+          if (t < 1) requestAnimationFrame(riseAnim);
+        };
+        requestAnimationFrame(riseAnim);
+      }
+
+      initEvents() {
+        const handleStart = (e) => {
+          if (e.target.closest('#game-over-modal') || e.target.closest('.top-actions')) return;
+          if (this.state !== 'IDLE') return;
+          e.preventDefault();
+          this.startCharge();
+        };
+
+        const handleEnd = (e) => {
+          if (this.state !== 'CHARGING') return;
+          e.preventDefault();
+          this.releaseJump();
+        };
+
+        window.addEventListener('mousedown', handleStart);
+        window.addEventListener('mouseup', handleEnd);
+        window.addEventListener('touchstart', handleStart, { passive: false });
+        window.addEventListener('touchend', handleEnd, { passive: false });
+
+        // 重新開始
+        document.getElementById('btn-restart').addEventListener('click', () => {
+          this.restartGame();
+        });
+
+        // 聲音開關
+        const soundBtn = document.getElementById('btn-sound-toggle');
+        soundBtn.addEventListener('click', () => {
+          sound.enabled = !sound.enabled;
+          soundBtn.textContent = sound.enabled ? '🔊' : '🔇';
+        });
+
+        // 導出 GLB 檔案
+        const exportGlb = () => {
+          this.exportCowModel();
+        };
+        document.getElementById('btn-export-glb').addEventListener('click', exportGlb);
+        document.getElementById('btn-modal-export').addEventListener('click', exportGlb);
+      }
+
+      startCharge() {
+        this.state = 'CHARGING';
+        this.chargeStartTime = performance.now();
+        this.instructionEl.style.opacity = '0';
+        this.chargeMeter.style.opacity = '1';
+        this.chargeFill.style.width = '0%';
+        sound.playChargeStart();
+      }
+
+      releaseJump() {
+        if (this.state !== 'CHARGING') return;
+        this.state = 'JUMPING';
+        this.chargeMeter.style.opacity = '0';
+        sound.playJump();
+
+        const duration = (performance.now() - this.chargeStartTime) / 1000;
+        // 蓄力比例（限制最大值 1.8 秒）
+        const clampedDur = Math.min(Math.max(duration, 0.15), 1.7);
+        this.jumpDistance = clampedDur * 5.2; // 係數
+
+        this.jumpStartPos = this.cow.position.clone();
+        this.jumpDir = this.nextDirection.clone();
+        this.jumpTargetPos = this.jumpStartPos.clone().add(this.jumpDir.clone().multiplyScalar(this.jumpDistance));
+        this.jumpStartTime = performance.now();
+        this.jumpDuration = 480 + clampedDur * 120; // 飛行時間 ms
+
+        // 恢復牛的身材比例並彈出
+        const ud = this.cow.userData;
+        if (ud && ud.bodyGroup) {
+          ud.bodyGroup.scale.set(1.0, 1.35, 1.0); // 向上彈射拉伸感
+        }
+      }
+
+      animateJump(now) {
+        const elapsed = now - this.jumpStartTime;
+        const progress = Math.min(elapsed / this.jumpDuration, 1);
+
+        // 水平位移 (線性插值)
+        this.cow.position.x = THREE.MathUtils.lerp(this.jumpStartPos.x, this.jumpTargetPos.x, progress);
+        this.cow.position.z = THREE.MathUtils.lerp(this.jumpStartPos.z, this.jumpTargetPos.z, progress);
+
+        // 垂直拋物線位移: 4 * h * p * (1 - p)
+        const peakHeight = 2.6 + this.jumpDistance * 0.22;
+        const heightArc = 4 * peakHeight * progress * (1 - progress);
+        this.cow.position.y = this.jumpStartPos.y + heightArc;
+
+        // 空中 360 度翻滾旋轉動畫 (經典跳一跳動作！)
+        const rollAngle = progress * Math.PI * 2;
+        if (this.jumpDir.x > 0.5) {
+          // 向右前翻滾
+          this.cow.rotation.z = -rollAngle;
+          this.cow.rotation.x = 0;
+        } else {
+          // 向左前翻滾
+          this.cow.rotation.x = -rollAngle;
+          this.cow.rotation.z = 0;
+        }
+
+        // 跳躍完成，進入著陸判定
+        if (progress >= 1) {
+          this.cow.rotation.set(0, 0, 0); // 轉正
+          this.checkLanding();
+        }
+      }
+
+      checkLanding() {
+        const cowX = this.cow.position.x;
+        const cowZ = this.cow.position.z;
+
+        const currentBlock = this.blocks[this.currentBlockIndex];
+        const targetBlock = this.blocks[this.currentBlockIndex + 1];
+
+        // 著陸目標檢測（可能是停留在原地，也可能是跳上了新方塊）
+        const testLanding = (block) => {
+          const bx = block.position.x;
+          const bz = block.position.z;
+          const radius = block.userData.radius || 1.2;
+          const dist = Math.hypot(cowX - bx, cowZ - bz);
+          return { landed: dist <= radius * 1.08, dist: dist, radius: radius };
+        };
+
+        const targetResult = testLanding(targetBlock);
+        const currentResult = testLanding(currentBlock);
+
+        if (targetResult.landed) {
+          // 成功跳上下一個方塊！
+          this.currentBlockIndex++;
+          this.state = 'LANDED';
+          sound.playLand();
+
+          // 是否命中中心 (跳一跳經典機制)
+          if (targetResult.dist < 0.38) {
+            this.combo++;
+            const addPoints = this.combo * 2;
+            this.score += addPoints;
+            sound.playPerfect(this.combo);
+            this.showScorePopup(`+${addPoints}`, this.cow.position);
+            this.createShockwave(targetBlock.position);
+          } else {
+            this.combo = 0;
+            this.score += 1;
+            this.showScorePopup('+1', this.cow.position);
+          }
+
+          this.updateUI();
+
+          // 著陸 Squash 回彈動畫
+          this.playLandBounce();
+
+          // 相機跟隨滑動
+          this.smoothMoveCameraTo(this.cow.position);
+
+          // 生成下一個方塊
+          this.spawnNextBlock();
+
+          setTimeout(() => {
+            if (this.state === 'LANDED') {
+              this.state = 'IDLE';
+            }
+          }, 350);
+
+        } else if (currentResult.landed && this.jumpDistance < 1.2) {
+          // 跳得太短，落回原地方塊
+          this.state = 'LANDED';
+          sound.playLand();
+          this.playLandBounce();
+          setTimeout(() => {
+            this.state = 'IDLE';
+          }, 300);
+
+        } else {
+          // 掉出方塊外，失敗跌落！
+          this.triggerGameOver(cowX, cowZ, targetBlock);
+        }
+      }
+
+      playLandBounce() {
+        const ud = this.cow.userData;
+        if (!ud || !ud.bodyGroup) return;
+        const start = performance.now();
+        const anim = (now) => {
+          const p = (now - start) / 250;
+          if (p <= 1) {
+            // 先壓扁後彈起恢復
+            const squash = Math.sin(p * Math.PI) * 0.25;
+            ud.bodyGroup.scale.set(1.0 + squash, 1.0 - squash, 1.0 + squash);
+            requestAnimationFrame(anim);
+          } else {
+            ud.bodyGroup.scale.set(1, 1, 1);
+          }
+        };
+        requestAnimationFrame(anim);
+      }
+
+      createShockwave(pos) {
+        // 中心白色衝擊波環
+        const ringGeo = new THREE.RingGeometry(0.1, 0.25, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(pos.x, 0.72, pos.z);
+        this.scene.add(ring);
+
+        const start = performance.now();
+        const anim = (now) => {
+          const t = (now - start) / 450;
+          if (t <= 1) {
+            const scale = 1 + t * 4;
+            ring.scale.set(scale, scale, scale);
+            ring.material.opacity = 0.9 * (1 - t);
+            requestAnimationFrame(anim);
+          } else {
+            this.scene.remove(ring);
+          }
+        };
+        requestAnimationFrame(anim);
+      }
+
+      showScorePopup(text, pos) {
+        const screenPos = pos.clone();
+        screenPos.y += 1.8;
+        screenPos.project(this.camera);
+
+        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+
+        const el = document.createElement('div');
+        el.className = 'score-popup';
+        el.textContent = text;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        document.body.appendChild(el);
+
+        setTimeout(() => el.remove(), 800);
+      }
+
+      smoothMoveCameraTo(targetPos) {
+        this.cameraTarget.set(targetPos.x, 1.5, targetPos.z);
+        // 相機平行移動
+        this.cameraTargetPos = new THREE.Vector3(targetPos.x + 16, 20, targetPos.z + 16);
+      }
+
+      triggerGameOver(cowX, cowZ, nearestBlock) {
+        this.state = 'GAMEOVER';
+        sound.playFall();
+
+        // 摔落物理旋轉動畫
+        const startY = this.cow.position.y;
+        const start = performance.now();
+        const fallAnim = (now) => {
+          const t = (now - start) / 600;
+          if (t <= 1) {
+            this.cow.position.y = startY - t * t * 14;
+            this.cow.rotation.x += 0.08;
+            this.cow.rotation.z += 0.06;
+            requestAnimationFrame(fallAnim);
+          }
+        };
+        requestAnimationFrame(fallAnim);
+
+        // 結算最高分
+        if (this.score > this.highScore) {
+          this.highScore = this.score;
+          localStorage.setItem('niulai_jump_best', this.highScore.toString());
+        }
+
+        setTimeout(() => {
+          this.modalScore.textContent = this.score;
+          this.modalBest.textContent = `歷史最佳: ${this.highScore}`;
+          this.gameOverModal.style.display = 'flex';
+        }, 650);
+      }
+
+      restartGame() {
+        this.gameOverModal.style.display = 'none';
+        this.score = 0;
+        this.combo = 0;
+        this.updateUI();
+        this.initFirstBlocks();
+        this.cameraTarget.set(0, 1.5, 0);
+        this.camera.position.set(16, 20, 16);
+        this.cameraTargetPos = null;
+        this.state = 'IDLE';
+        this.instructionEl.style.opacity = '1';
+      }
+
+      updateUI() {
+        this.scoreEl.textContent = this.score;
+        this.highScoreEl.textContent = `最高紀錄: ${this.highScore}`;
+      }
+
+      exportCowModel() {
+        if (!THREE.GLTFExporter) {
+          alert('GLTFExporter 加載中，請稍後重試');
+          return;
+        }
+        const exporter = new THREE.GLTFExporter();
+        const exportTarget = this.cow.clone();
+        exportTarget.position.set(0, 0, 0);
+        exportTarget.rotation.set(0, 0, 0);
+        exportTarget.scale.set(1, 1, 1);
+
+        exporter.parse(
+          exportTarget,
+          (gltf) => {
+            const blob = new Blob([gltf], { type: 'model/gltf-binary' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'niulai_cow_model.glb';
+            link.click();
+            URL.revokeObjectURL(link.href);
+          },
+          { binary: true }
+        );
+      }
+
+      animate(now) {
+        requestAnimationFrame(this.animate);
+
+        // 待機小牛微呼吸
+        const ud = this.cow.userData;
+        if (this.state === 'IDLE' && ud) {
+          const breath = Math.sin(now * 0.0035) * 0.03;
+          this.cow.position.y = (this.blocks[this.currentBlockIndex].userData.height / 2 + 0.05) + breath * 0.5;
+          if (ud.arms && ud.arms[0]) {
+            ud.arms[0].rotation.x = Math.sin(now * 0.003) * 0.08;
+            ud.arms[1].rotation.x = -Math.sin(now * 0.003) * 0.08;
+          }
+        }
+
+        // 蓄力中壓扁動畫
+        if (this.state === 'CHARGING' && ud && ud.bodyGroup) {
+          const duration = (now - this.chargeStartTime) / 1000;
+          const ratio = Math.min(duration / 1.6, 1);
+          this.chargeFill.style.width = `${ratio * 100}%`;
+
+          // 身體下沉壓扁
+          const squashY = THREE.MathUtils.lerp(1.0, 0.62, ratio);
+          const expandXZ = THREE.MathUtils.lerp(1.0, 1.25, ratio);
+          ud.bodyGroup.scale.set(expandXZ, squashY, expandXZ);
+
+          // 腳下方塊微凹陷
+          const curBlock = this.blocks[this.currentBlockIndex];
+          if (curBlock) {
+            curBlock.scale.y = THREE.MathUtils.lerp(1.0, 0.88, ratio);
+          }
+        } else if (this.state !== 'JUMPING' && this.blocks[this.currentBlockIndex]) {
+          this.blocks[this.currentBlockIndex].scale.y = 1.0;
+        }
+
+        // 跳躍中
+        if (this.state === 'JUMPING') {
+          this.animateJump(now);
+        }
+
+        // 相機平滑插值 Lerp 跟隨
+        if (this.cameraTargetPos) {
+          this.camera.position.lerp(this.cameraTargetPos, 0.08);
+          const curLook = new THREE.Vector3();
+          this.camera.getWorldDirection(curLook);
+          this.camera.lookAt(this.cameraTarget);
+        }
+
+        // 渲染
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+    // 啟動遊戲
+    window.addEventListener('DOMContentLoaded', () => {
+      window.game = new JumpGame();
+    });
+  </script>
+</body>
+</html>
