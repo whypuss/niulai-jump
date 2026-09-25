@@ -1287,56 +1287,69 @@
         // ==========================================
     // 2.7 《最強領主：軍團攻城齊射》核心系統 (Army Archer Siege)
     // ==========================================
+        // ==========================================
+    // 2.7 《最強領主：軍團攻城齊射》V2 深度成長與決策版
+    // ==========================================
     class ArmyArcherSiege {
       constructor(game) {
         this.game = game;
         this.active = false;
 
-        // 透視攻城相機（略高仰角俯視全景）
-        this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
-        this.camera.position.set(0, 18, 22);
-        this.camera.lookAt(0, 2, -15);
+        // 透視攻城視角
+        this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 350);
+        this.camera.position.set(0, 19, 24);
+        this.camera.lookAt(0, 2, -18);
 
-        // 專屬戰場場景
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x161e2e);
-        this.scene.fog = new THREE.FogExp2(0x161e2e, 0.012);
+        this.scene.background = new THREE.Color(0x131a26);
+        this.scene.fog = new THREE.FogExp2(0x131a26, 0.010);
 
-        // 戰場光影
+        // 燈光系統
         const hemi = new THREE.HemisphereLight(0xddeeff, 0x112233, 0.9);
         this.scene.add(hemi);
-        const dir = new THREE.DirectionalLight(0xfffaed, 1.4);
-        dir.position.set(15, 30, 20);
+        const dir = new THREE.DirectionalLight(0xfffaed, 1.3);
+        dir.position.set(16, 32, 22);
         dir.castShadow = true;
         this.scene.add(dir);
 
-        // 攻城石道與城牆兩側
         this.trackWidth = 16;
-        this.trackLength = 140;
+        this.trackLength = 260; // 延長通道以容納完整關卡歷程
         this.createSiegeCorridor();
 
         // 軍團狀態
-        this.armyCount = 20; // 初始兵力
+        this.armyCount = 6; // 開局 6 隻微型兵力！
+        this.maxEverArmy = 6;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
-        this.soldiers = []; // 網格實體陣列
+        this.soldiers = [];
         this.soldierGroup = new THREE.Group();
         this.scene.add(this.soldierGroup);
 
-        // 箭矢彈幕對象池
+        // 武器強化狀態
+        this.weaponBuff = {
+          type: 'normal', // normal, rapid, pierce, fire
+          duration: 0,
+          ammo: 0,
+          name: '普通短弓'
+        };
+
+        // 實體管理
         this.arrows = [];
         this.lastVolleyTime = 0;
-        this.volleyInterval = 180; // 毫秒集體齊射波次
+        this.baseVolleyInterval = 320; // 初始射速慢
 
-        // 增兵節點門 (Buff Gates)
-        this.gates = [];
-
-        // 敵方人海與 Boss
-        this.redEnemies = [];
+        this.decisionSections = []; // 二選一叉路與分隔牆
+        this.enemies = []; // 敵人群體 (普通小兵、盾兵、精英小隊長)
         this.boss = null;
-        this.bossHp = 1367;
-        this.bossMaxHp = 1367;
+        this.bossHp = 2000;
+        this.bossMaxHp = 2000;
         this.bossType = 'leopard';
+        this.bossStageActive = false;
+        this.bossLastAttackTime = 0;
+
+        // 滾動/推進距離
+        this.worldZ = 0;
+        this.marchSpeed = 0.14; // 軍團緩慢向前推進
 
         // 操控輸入
         this.isPointerDown = false;
@@ -1355,36 +1368,22 @@
       }
 
       createSiegeCorridor() {
-        // 中世紀石磚攻城通道
-        const groundGeo = new THREE.PlaneGeometry(this.trackWidth, this.trackLength, 10, 30);
-        const groundMat = new THREE.MeshStandardMaterial({
-          color: 0x2b3545,
-          roughness: 0.85
-        });
+        const groundGeo = new THREE.PlaneGeometry(this.trackWidth, this.trackLength, 12, 50);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x222a36, roughness: 0.85 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
-        ground.position.set(0, 0, -this.trackLength / 2 + 15);
+        ground.position.set(0, 0, -this.trackLength / 2 + 20);
         ground.receiveShadow = true;
         this.scene.add(ground);
 
-        // 兩側攻城城垛矮牆
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x485568, roughness: 0.7 });
-        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, this.trackLength), wallMat);
-        leftWall.position.set(-this.trackWidth / 2 - 0.4, 0.8, ground.position.z);
+        // 兩側高聳攻城護牆
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x3d4756, roughness: 0.7 });
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.5, this.trackLength), wallMat);
+        leftWall.position.set(-this.trackWidth / 2 - 0.5, 1.25, ground.position.z);
         const rightWall = leftWall.clone();
-        rightWall.position.set(this.trackWidth / 2 + 0.4, 0.8, ground.position.z);
+        rightWall.position.set(this.trackWidth / 2 + 0.5, 1.25, ground.position.z);
         this.scene.add(leftWall);
         this.scene.add(rightWall);
-
-        // 賽道分段裝飾橫條
-        for (let z = 10; z > -this.trackLength; z -= 14) {
-          const stripe = new THREE.Mesh(
-            new THREE.BoxGeometry(this.trackWidth, 0.04, 0.6),
-            new THREE.MeshBasicMaterial({ color: 0x1f2937 })
-          );
-          stripe.position.set(0, 0.02, z);
-          this.scene.add(stripe);
-        }
       }
 
       initControls() {
@@ -1397,8 +1396,8 @@
 
         const onMove = (clientX) => {
           if (!this.active || !this.isPointerDown) return;
-          const deltaX = (clientX - this.pointerStartX) / (window.innerWidth * 0.35);
-          const limit = (this.trackWidth / 2) - 2.5;
+          const deltaX = (clientX - this.pointerStartX) / (window.innerWidth * 0.32);
+          const limit = (this.trackWidth / 2) - 2.2;
           this.targetArmyX = Math.max(-limit, Math.min(limit, this.armyStartX + deltaX * 12));
         };
 
@@ -1427,101 +1426,80 @@
       start(failBlockPos) {
         this.active = true;
         this.savedBlockPos = failBlockPos.clone();
+        this.worldZ = 0;
 
-        // 切換 UI
         document.getElementById('ui-overlay').style.display = 'none';
         this.uiLayer.style.display = 'block';
         this.reviveNotice.style.display = 'none';
 
-        // 初始兵力 24 人，沿途通過增兵門可迅速暴增到幾百人！
-        this.armyCount = 24;
+        // 1. 開局微型兵力：6 隻！
+        this.armyCount = 6;
+        this.maxEverArmy = 6;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
+        this.weaponBuff = { type: 'normal', duration: 0, ammo: 0, name: '普通短弓' };
 
-        // 清理歷史實體
+        // 清空歷史實體
         while (this.soldierGroup.children.length > 0) {
           this.soldierGroup.remove(this.soldierGroup.children[0]);
         }
         this.soldiers = [];
         this.arrows.forEach(a => this.scene.remove(a.mesh));
         this.arrows = [];
-        this.gates.forEach(g => this.scene.remove(g.group));
-        this.gates = [];
-        this.redEnemies.forEach(e => this.scene.remove(e.mesh));
-        this.redEnemies = [];
+        this.enemies.forEach(e => this.scene.remove(e.group));
+        this.enemies = [];
+        this.decisionSections.forEach(d => {
+          this.scene.remove(d.wall);
+          this.scene.remove(d.leftGate.group);
+          if (d.rightOrb) this.scene.remove(d.rightOrb.group);
+          if (d.rightGate) this.scene.remove(d.rightGate.group);
+        });
+        this.decisionSections = [];
         if (this.boss) this.scene.remove(this.boss);
+        this.bossStageActive = false;
 
-        // 構建弓箭兵密集隊形
         this.rebuildArmyFormation();
 
-        // 放置左側 / 路徑上的連續 +1 / +5 / ×2 增兵門（完全還原圖片）
-        this.spawnBuffGates();
-
-        // 生成敵方大批紅色小兵軍陣（前排與後衛）
-        this.spawnRedEnemyHorde();
-
-        // 隨機生成強大攻城 Boss (豹 / 大牛 / 青蛇)
-        const bosses = ['leopard', 'bull', 'snake'];
-        this.bossType = bosses[Math.floor(Math.random() * bosses.length)];
-        let bossName = "狂暴獵豹 BOSS";
-        if (this.bossType === 'leopard') {
-          this.boss = createLeopardBossModel();
-          this.bossMaxHp = 1367; // 對齊圖一 1367 數值
-          bossName = "⚡ 狂暴獵豹 BOSS";
-        } else if (this.bossType === 'bull') {
-          this.boss = createBigBullBossModel();
-          this.bossMaxHp = 1888;
-          bossName = "🔥 狂暴大戰牛 BOSS";
-        } else {
-          this.boss = createGreenSnakeBossModel();
-          this.bossMaxHp = 1520;
-          bossName = "🐍 幽冥青蛇王 BOSS";
-        }
-        this.bossHp = this.bossMaxHp;
-        this.bossNameText.textContent = bossName;
-        this.boss.position.set(0, 0, -38);
-        this.scene.add(this.boss);
+        // 2. 構建階段性關卡：怪物波次 + 二選一實體分隔牆 + 玻璃球
+        this.buildStageProgress();
 
         this.updateUI();
         sound.playBossAlarm();
       }
 
       rebuildArmyFormation() {
-        // 清理現存士兵模型
         while (this.soldierGroup.children.length > 0) {
           this.soldierGroup.remove(this.soldierGroup.children[0]);
         }
         this.soldiers = [];
 
-        // 密集軍陣站位計算：以密集橢圓/蜂窩排列擴張
-        const displayCount = Math.min(this.armyCount, 120); // 最多渲染 120 個實體以保證流暢 60FPS
         const blueUniformMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.5 });
         const yellowFurMat = new THREE.MeshStandardMaterial({ color: 0xe0a62f, roughness: 0.7 });
-        const bowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 });
+        const bowMat = new THREE.MeshStandardMaterial({
+          color: this.weaponBuff.type === 'fire' ? 0xff4500 : (this.weaponBuff.type === 'rapid' ? 0x00ffff : 0xd97706),
+          roughness: 0.5
+        });
 
+        const displayCount = Math.min(this.armyCount, 100);
         for (let i = 0; i < displayCount; i++) {
-          // 螺旋向外排列 (Fermat's spiral)
-          const angle = i * 2.39996; // 黃金角
-          const radius = Math.sqrt(i) * 0.45;
-          const lx = Math.cos(angle) * radius * 1.35; // 寬略大於深
-          const lz = Math.sin(angle) * radius * 0.95;
+          const angle = i * 2.39996;
+          const radius = Math.sqrt(i) * 0.42;
+          const lx = Math.cos(angle) * radius * 1.3;
+          const lz = Math.sin(angle) * radius * 0.9;
 
           const s = new THREE.Group();
-          // 身軀 (藍色制服)
-          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.8, 10), blueUniformMat);
-          body.position.y = 0.4;
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.75, 8), blueUniformMat);
+          body.position.y = 0.38;
           body.castShadow = true;
           s.add(body);
 
-          // 牛來頭部 (黃牛頭)
-          const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), yellowFurMat);
-          head.position.y = 0.95;
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), yellowFurMat);
+          head.position.y = 0.88;
           head.castShadow = true;
           s.add(head);
 
-          // 戰弓 (Bow)
-          const bow = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 6, 12, Math.PI), bowMat);
-          bow.position.set(0.32, 0.6, -0.2);
+          const bow = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.035, 6, 10, Math.PI), bowMat);
+          bow.position.set(0.3, 0.55, -0.18);
           bow.rotation.y = Math.PI / 2;
           bow.rotation.z = Math.PI / 2;
           s.add(bow);
@@ -1532,198 +1510,500 @@
         }
       }
 
-      spawnBuffGates() {
-        // 依照圖片左側連續排列 +1 / +5 增兵節點
-        const gateConfigs = [
-          { z: -10, x: -4.5, text: '+1', add: 1 },
-          { z: -16, x: -4.5, text: '+1', add: 1 },
-          { z: -22, x: -4.5, text: '+5', add: 5 },
-          { z: -28, x: 3.5, text: '×2', mult: 2 },
-          { z: -34, x: -3.5, text: '+20', add: 20 },
-        ];
+      buildStageProgress() {
+        // --- 波次 1: 熱身 3 隻普通小兵 (Z: -12) ---
+        this.spawnMobBatch(3, -12, 'normal', 45);
 
-        gateConfigs.forEach(cfg => {
-          const gGroup = new THREE.Group();
-          gGroup.position.set(cfg.x, 0, cfg.z);
-
-          // 藍色能量科技門框
-          const frameMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-          const bar1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 8), frameMat);
-          bar1.position.set(-1.8, 1.6, 0);
-          const bar2 = bar1.clone();
-          bar2.position.set(1.8, 1.6, 0);
-          const topBar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.8, 8), frameMat);
-          topBar.rotation.z = Math.PI / 2;
-          topBar.position.set(0, 3.2, 0);
-
-          // 光能半透明門幕
-          const curtainMat = new THREE.MeshBasicMaterial({
-            color: 0x0088ff,
-            transparent: true,
-            opacity: 0.35,
-            side: THREE.DoubleSide
-          });
-          const curtain = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.2), curtainMat);
-          curtain.position.set(0, 1.6, 0);
-
-          gGroup.add(bar1);
-          gGroup.add(bar2);
-          gGroup.add(topBar);
-          gGroup.add(curtain);
-
-          // 3D 浮動數值標籤（用動態 Canvas 紋理）
-          const canvas = document.createElement('canvas');
-          canvas.width = 128; canvas.height = 64;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#00f0ff';
-          ctx.font = 'bold 44px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(cfg.text, 64, 32);
-
-          const tex = new THREE.CanvasTexture(canvas);
-          const tagMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-          const tagPlane = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), tagMat);
-          tagPlane.position.set(0, 3.6, 0);
-          gGroup.add(tagPlane);
-
-          this.scene.add(gGroup);
-          this.gates.push({
-            group: gGroup,
-            config: cfg,
-            z: cfg.z,
-            x: cfg.x,
-            width: 3.8,
-            triggered: false
-          });
+        // --- 選擇 1 (Z: -28): 左路 [+4 士兵] vs 右路 [120 HP 玻璃球：連發弓] ---
+        this.createDecisionPoint(-28, {
+          left: { type: 'add_soldier', val: 4, text: '+4 士兵' },
+          right: { type: 'weapon_orb', hp: 120, weapon: 'rapid', text: '連發弓 (120 HP)' }
         });
+
+        // --- 波次 2: 密集小兵 8 隻 (Z: -48) ---
+        this.spawnMobBatch(8, -48, 'normal', 55);
+
+        // --- 選擇 2 (Z: -66): 左路 [+6 士兵] vs 右路 [220 HP 玻璃球：穿透箭] ---
+        this.createDecisionPoint(-66, {
+          left: { type: 'add_soldier', val: 6, text: '+6 士兵' },
+          right: { type: 'weapon_orb', hp: 220, weapon: 'pierce', text: '穿透箭 (220 HP)' }
+        });
+
+        // --- 波次 3: 混合防線 10 隻小兵 + 2 隻盾兵 (Z: -86) ---
+        this.spawnMobBatch(10, -86, 'normal', 60);
+        this.spawnMobBatch(2, -88, 'shield', 180);
+
+        // --- 中段精英戰: 600 HP 赤紅小隊長 (Z: -108) ---
+        this.spawnMiniBoss(-108, 600);
+
+        // --- 選擇 3 (Z: -128): 左路 [復活 40% 陣亡士兵] vs 右路 [350 HP 玻璃球：火焰箭] ---
+        this.createDecisionPoint(-128, {
+          left: { type: 'revive_ratio', ratio: 0.4, text: '復活40%' },
+          right: { type: 'weapon_orb', hp: 350, weapon: 'fire', text: '火焰箭 (350 HP)' }
+        });
+
+        // --- 波次 4: 最後衝鋒 14 隻小兵 + 2 隻盾兵 (Z: -150) ---
+        this.spawnMobBatch(14, -150, 'normal', 70);
+        this.spawnMobBatch(2, -152, 'shield', 220);
+
+        // --- 最終決戰前補給門 (Z: -174) ---
+        this.createDecisionPoint(-174, {
+          left: { type: 'add_soldier', val: 8, text: '+8 士兵' },
+          right: { type: 'weapon_orb', hp: 450, weapon: 'fire', text: '巨弩神火 (450 HP)' }
+        });
+
+        // --- 壓軸巨型 Boss 戰場 (Z: -205) ---
+        this.prepareFinalBoss(-205);
       }
 
-      spawnRedEnemyHorde() {
-        // 生成多排紅色敵方士兵
-        const redMat = new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.5 });
-        const rows = 5;
-        const cols = 8;
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.1, 0.65), redMat);
-            m.castShadow = true;
-            m.position.set((c - 3.5) * 1.6, 0.55, -20 - r * 2.2);
-            this.scene.add(m);
-            this.redEnemies.push({
-              mesh: m,
-              hp: 60,
-              maxHp: 60,
-              speed: 0.04
-            });
+      spawnMobBatch(count, zPos, mobType, hp) {
+        const mat = mobType === 'shield'
+          ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.4 })
+          : new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.6 });
+
+        for (let i = 0; i < count; i++) {
+          const g = new THREE.Group();
+          const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.7), mat);
+          body.position.y = 0.55;
+          body.castShadow = true;
+          g.add(body);
+
+          if (mobType === 'shield') {
+            // 正面高防巨盾
+            const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.3 });
+            const shield = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.15), shieldMat);
+            shield.position.set(0, 0.6, 0.45);
+            g.add(shield);
           }
+
+          const spread = Math.min(10, count * 1.4);
+          const x = (i - (count - 1) / 2) * (spread / Math.max(1, count - 1));
+          g.position.set(x, 0, zPos);
+          this.scene.add(g);
+
+          this.enemies.push({
+            group: g,
+            type: mobType,
+            hp: hp,
+            maxHp: hp,
+            z: zPos,
+            isMiniBoss: false
+          });
         }
       }
 
+      spawnMiniBoss(zPos, hp) {
+        const g = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.4 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.6), mat);
+        body.position.y = 1.1;
+        body.castShadow = true;
+        g.add(body);
+
+        // 精英怪角與肩甲
+        const shoulderMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.5, roughness: 0.3 });
+        const sLeft = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), shoulderMat);
+        sLeft.position.set(-1.0, 1.8, 0);
+        const sRight = sLeft.clone();
+        sRight.position.set(1.0, 1.8, 0);
+        g.add(sLeft); g.add(sRight);
+
+        g.position.set(0, 0, zPos);
+        this.scene.add(g);
+
+        this.enemies.push({
+          group: g,
+          type: 'miniboss',
+          hp: hp,
+          maxHp: hp,
+          z: zPos,
+          isMiniBoss: true
+        });
+      }
+
+      createDecisionPoint(zPos, config) {
+        // 1. 中間實體厚石牆：阻止玩家橫跳兩邊通吃！
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+        const midWall = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.2, 14), wallMat);
+        midWall.position.set(0, 1.6, zPos + 2);
+        midWall.castShadow = true;
+        this.scene.add(midWall);
+
+        // 2. 左路門 (增兵 / 復活)
+        const leftGate = this.createGateMesh(-4.2, zPos, config.left.text, 0x0088ff);
+        this.scene.add(leftGate.group);
+
+        // 3. 右路門/玻璃球
+        let rightOrb = null;
+        let rightGate = null;
+        if (config.right.type === 'weapon_orb') {
+          rightOrb = this.createWeaponOrbMesh(4.2, zPos, config.right);
+          this.scene.add(rightOrb.group);
+        } else {
+          rightGate = this.createGateMesh(4.2, zPos, config.right.text, 0x10b981);
+          this.scene.add(rightGate.group);
+        }
+
+        this.decisionSections.push({
+          z: zPos,
+          wall: midWall,
+          leftGate: leftGate,
+          leftConfig: config.left,
+          rightOrb: rightOrb,
+          rightGate: rightGate,
+          rightConfig: config.right,
+          resolved: false
+        });
+      }
+
+      createGateMesh(x, z, text, colorHex) {
+        const group = new THREE.Group();
+        group.position.set(x, 0, z);
+
+        const frameMat = new THREE.MeshBasicMaterial({ color: colorHex });
+        const leftBar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.2, 8), frameMat);
+        leftBar.position.set(-1.8, 1.6, 0);
+        const rightBar = leftBar.clone();
+        rightBar.position.set(1.8, 1.6, 0);
+        const topBar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.6, 8), frameMat);
+        topBar.rotation.z = Math.PI / 2;
+        topBar.position.set(0, 3.2, 0);
+
+        const curtainMat = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          transparent: true,
+          opacity: 0.35,
+          side: THREE.DoubleSide
+        });
+        const curtain = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.0), curtainMat);
+        curtain.position.set(0, 1.5, 0);
+
+        group.add(leftBar); group.add(rightBar); group.add(topBar); group.add(curtain);
+
+        // 標籤文字
+        const canvas = document.createElement('canvas');
+        canvas.width = 160; canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 80, 40);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const tag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+        tag.position.set(0, 3.6, 0);
+        group.add(tag);
+
+        return { group: group, width: 3.6 };
+      }
+
+      createWeaponOrbMesh(x, z, config) {
+        const group = new THREE.Group();
+        group.position.set(x, 1.6, z);
+
+        // 外層半透明帶 HP 的發光玻璃外殼
+        const glassMat = new THREE.MeshPhysicalMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.55,
+          roughness: 0.1,
+          transmission: 0.8,
+          thickness: 0.5
+        });
+        const glassSphere = new THREE.Mesh(new THREE.SphereGeometry(1.4, 24, 24), glassMat);
+        glassSphere.castShadow = true;
+        group.add(glassSphere);
+
+        // 內部懸浮發光武器核心模型
+        const weaponCoreMat = new THREE.MeshStandardMaterial({
+          color: config.weapon === 'fire' ? 0xff4500 : (config.weapon === 'rapid' ? 0x00f0ff : 0xa855f7),
+          emissive: config.weapon === 'fire' ? 0xff2200 : (config.weapon === 'rapid' ? 0x0088ff : 0x6b21a8),
+          emissiveIntensity: 0.6
+        });
+        const weaponCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.7, 0), weaponCoreMat);
+        group.add(weaponCore);
+
+        // 頂部 HP 數字標籤
+        const hpTagCanvas = document.createElement('canvas');
+        hpTagCanvas.width = 160; hpTagCanvas.height = 64;
+        const hpTagTex = new THREE.CanvasTexture(hpTagCanvas);
+        const hpTagMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.0), new THREE.MeshBasicMaterial({ map: hpTagTex, transparent: true }));
+        hpTagMesh.position.set(0, 2.0, 0);
+        group.add(hpTagMesh);
+
+        const orbObj = {
+          group: group,
+          glass: glassSphere,
+          core: weaponCore,
+          hpTagCanvas: hpTagCanvas,
+          hpTagTex: hpTagTex,
+          hp: config.hp,
+          maxHp: config.hp,
+          weapon: config.weapon,
+          text: config.text,
+          radius: 1.4,
+          broken: false
+        };
+
+        this.updateOrbHpTag(orbObj);
+        return orbObj;
+      }
+
+      updateOrbHpTag(orb) {
+        const ctx = orb.hpTagCanvas.getContext('2d');
+        ctx.clearRect(0, 0, 160, 64);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(10, 10, 140, 44);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(10, 10, 140, 44);
+
+        ctx.fillStyle = '#00f0ff';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${orb.hp} HP`, 80, 32);
+        orb.hpTagTex.needsUpdate = true;
+      }
+
+      prepareFinalBoss(zPos) {
+        const bosses = ['leopard', 'bull', 'snake'];
+        this.bossType = bosses[Math.floor(Math.random() * bosses.length)];
+        let bossName = "狂暴獵豹 BOSS";
+        if (this.bossType === 'leopard') {
+          this.boss = createLeopardBossModel();
+          this.bossMaxHp = 2000;
+          bossName = "⚡ 狂暴獵豹 BOSS";
+        } else if (this.bossType === 'bull') {
+          this.boss = createBigBullBossModel();
+          this.bossMaxHp = 2500;
+          bossName = "🔥 狂暴大戰牛 BOSS";
+        } else {
+          this.boss = createGreenSnakeBossModel();
+          this.bossMaxHp = 2200;
+          bossName = "🐍 幽冥青蛇王 BOSS";
+        }
+        this.bossHp = this.bossMaxHp;
+        this.bossNameText.textContent = bossName;
+        this.boss.position.set(0, 0, zPos);
+        this.bossZ = zPos;
+        this.scene.add(this.boss);
+      }
+
       triggerVolley() {
-        // 軍團全體弓箭齊射！箭矢數量與部隊兵力成正比
-        const arrowCount = Math.min(Math.floor(this.armyCount * 0.6) + 4, 48);
+        // 依武器決定射擊模式
+        let arrowCount = Math.min(Math.floor(this.armyCount * 0.7) + 3, 36);
+        let arrowColor = 0x38bdf8;
+        let damage = 25;
+        let isPierce = false;
+        let isFire = false;
+
+        if (this.weaponBuff.type === 'rapid') {
+          arrowColor = 0x00ffff;
+          damage = 32;
+        } else if (this.weaponBuff.type === 'pierce') {
+          arrowColor = 0xa855f7;
+          damage = 45;
+          isPierce = true;
+        } else if (this.weaponBuff.type === 'fire') {
+          arrowColor = 0xff4500;
+          damage = 60;
+          isFire = true;
+        }
+
         const arrowGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6);
-        const arrowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const arrowMat = new THREE.MeshBasicMaterial({ color: arrowColor });
 
         for (let i = 0; i < arrowCount; i++) {
           const arrow = new THREE.Mesh(arrowGeo, arrowMat);
           arrow.rotation.x = Math.PI / 2;
 
-          // 從軍團不同士兵位置射出
-          const rx = this.armyCenterX + (Math.random() - 0.5) * (Math.sqrt(this.armyCount) * 0.7);
-          const rz = (Math.random() - 0.5) * 2.0;
+          const rx = this.armyCenterX + (Math.random() - 0.5) * (Math.sqrt(this.armyCount) * 0.65);
+          const rz = -this.worldZ + (Math.random() - 0.5) * 1.8;
           arrow.position.set(rx, 1.2 + Math.random() * 0.4, rz - 0.5);
 
           this.scene.add(arrow);
           this.arrows.push({
             mesh: arrow,
-            speed: 1.8,
-            damage: 28,
+            speed: 1.9,
+            damage: damage,
+            isPierce: isPierce,
+            isFire: isFire,
             vx: (Math.random() - 0.5) * 0.04
           });
         }
+
+        // 消耗彈藥/時間
+        if (this.weaponBuff.ammo > 0) {
+          this.weaponBuff.ammo--;
+          if (this.weaponBuff.ammo <= 0) {
+            this.weaponBuff = { type: 'normal', duration: 0, ammo: 0, name: '普通短弓' };
+            this.rebuildArmyFormation();
+            this.updateUI();
+          }
+        }
+
         sound.playLaser();
       }
 
       update(now) {
         if (!this.active) return;
 
-        // 平滑跟隨操控走位
-        this.armyCenterX += (this.targetArmyX - this.armyCenterX) * 0.22;
+        // 1. 部隊向前推進（如果還未進入 Boss 決戰死斗場）
+        if (!this.bossStageActive) {
+          this.worldZ += this.marchSpeed;
+          this.soldierGroup.position.z = -this.worldZ;
+          this.camera.position.z = -this.worldZ + 24;
+
+          // 當推進到 Boss 決戰區 (Z: -195)
+          if (this.worldZ > 195) {
+            this.bossStageActive = true;
+            sound.playBossAlarm();
+          }
+        }
+
+        // 2. 玩家操控橫向走位
+        // 如果在分岔石牆區，限制不能穿牆！
+        let targetX = this.targetArmyX;
+        for (let d of this.decisionSections) {
+          const relZ = -this.worldZ - d.z;
+          if (relZ > -7 && relZ < 7) {
+            // 在石牆區域：左側限制在 [-7, -0.6]，右側限制在 [0.6, 7]
+            if (this.armyCenterX < 0) {
+              targetX = Math.min(-0.6, targetX);
+            } else {
+              targetX = Math.max(0.6, targetX);
+            }
+          }
+        }
+
+        this.armyCenterX += (targetX - this.armyCenterX) * 0.22;
         this.soldierGroup.position.x = this.armyCenterX;
         this.camera.position.x = this.armyCenterX * 0.35;
 
-        // 士兵集體踏步呼吸
+        // 士兵集體踏步動態
         const marchTime = now * 0.012;
         this.soldiers.forEach((s, idx) => {
           s.position.y = Math.abs(Math.sin(marchTime + idx * 0.3)) * 0.12;
-          s.rotation.y = (this.targetArmyX - this.armyCenterX) * -0.2; // 側傾
         });
 
-        // 定時軍團自動萬箭齊發
-        if (now - this.lastVolleyTime > this.volleyInterval) {
+        // 3. 旋轉武器玻璃球內的核心
+        this.decisionSections.forEach(d => {
+          if (d.rightOrb && !d.rightOrb.broken) {
+            d.rightOrb.core.rotation.x += 0.03;
+            d.rightOrb.core.rotation.y += 0.04;
+          }
+        });
+
+        // 4. 定時齊射（攻速受連發弓 Buff 影響）
+        let interval = this.baseVolleyInterval;
+        if (this.weaponBuff.type === 'rapid') interval *= 0.5;
+
+        if (now - this.lastVolleyTime > interval) {
           this.triggerVolley();
           this.lastVolleyTime = now;
         }
 
-        // 增兵節點碰撞檢測（踏入光門立刻增兵並膨脹軍陣）
-        this.gates.forEach(g => {
-          if (!g.triggered) {
-            // 當前軍團中心位置約在 Z: 0 附近
-            const distZ = Math.abs(0 - g.z);
-            const distX = Math.abs(this.armyCenterX - g.x);
-            if (distZ < 1.8 && distX < g.width / 2 + 1.0) {
-              g.triggered = true;
-              // 增兵
-              if (g.config.mult) {
-                this.armyCount = Math.floor(this.armyCount * g.config.mult);
-              } else if (g.config.add) {
-                this.armyCount += g.config.add;
+        // 檢查限時武器過期
+        if (this.weaponBuff.duration > 0 && now > this.weaponBuff.duration) {
+          this.weaponBuff = { type: 'normal', duration: 0, ammo: 0, name: '普通短弓' };
+          this.rebuildArmyFormation();
+          this.updateUI();
+        }
+
+        // 5. 二選一門與觸發檢測
+        this.decisionSections.forEach(d => {
+          if (!d.resolved) {
+            const currentZ = -this.worldZ;
+            if (Math.abs(currentZ - d.z) < 1.6) {
+              // 踩中左路門
+              if (this.armyCenterX < -1.5) {
+                d.resolved = true;
+                this.applyReward(d.leftConfig);
+                sound.playPerfect(3);
+                d.leftGate.group.visible = false;
+                if (d.rightOrb) d.rightOrb.group.visible = false;
+                if (d.rightGate) d.rightGate.group.visible = false;
               }
-              // 播放金幣/增益特效
-              this.showBuffPopup(g.config.text, g.group.position);
-              sound.playPerfect(3);
-              this.rebuildArmyFormation();
-              this.updateUI();
-              // 門變暗隱藏
-              g.group.visible = false;
+              // 踩中右路普通門
+              else if (this.armyCenterX > 1.5 && d.rightGate) {
+                d.resolved = true;
+                this.applyReward(d.rightConfig);
+                sound.playPerfect(3);
+                d.leftGate.group.visible = false;
+                d.rightGate.group.visible = false;
+              }
             }
           }
         });
 
-        // 箭矢前進與傷害判定
+        // 6. 箭矢飛行與命中檢測
         for (let i = this.arrows.length - 1; i >= 0; i--) {
           const a = this.arrows[i];
           a.mesh.position.z -= a.speed;
           a.mesh.position.x += a.vx;
 
-          let hit = false;
-          // 擊中紅色小兵群
-          for (let j = this.redEnemies.length - 1; j >= 0; j--) {
-            const e = this.redEnemies[j];
-            const dist = Math.hypot(a.mesh.position.x - e.mesh.position.x, a.mesh.position.z - e.mesh.position.z);
-            if (dist < 1.0) {
-              e.hp -= a.damage;
-              this.showDamageText(a.damage, e.mesh.position);
-              if (e.hp <= 0) {
-                this.scene.remove(e.mesh);
-                this.redEnemies.splice(j, 1);
-                sound.playExplode();
+          let removeArrow = false;
+
+          // (A) 檢測是否射中武器玻璃球
+          for (let d of this.decisionSections) {
+            const orb = d.rightOrb;
+            if (orb && !orb.broken) {
+              const oDist = Math.hypot(a.mesh.position.x - orb.group.position.x, a.mesh.position.z - orb.group.position.z);
+              if (oDist < orb.radius) {
+                orb.hp -= a.damage;
+                this.showDamageText(a.damage, orb.group.position);
+                this.updateOrbHpTag(orb);
+
+                if (orb.hp <= 0) {
+                  // 射破玻璃球！取得武器！
+                  orb.broken = true;
+                  this.scene.remove(orb.group);
+                  this.applyWeapon(orb.weapon);
+                  this.showBuffPopup("獲得：" + orb.text + "！", orb.group.position);
+                  sound.playWinFanfare();
+                }
+                removeArrow = !a.isPierce;
+                break;
               }
-              hit = true;
-              break;
             }
           }
 
-          // 擊中攻城 Boss
-          if (!hit && this.boss) {
+          // (B) 檢測是否射中敵方小兵/盾兵/精英怪
+          if (!removeArrow) {
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+              const e = this.enemies[j];
+              const dist = Math.hypot(a.mesh.position.x - e.group.position.x, a.mesh.position.z - e.group.position.z);
+              if (dist < (e.isMiniBoss ? 1.8 : 0.9)) {
+                // 盾兵正面減傷 (除非穿透或火焰)
+                let actualDmg = a.damage;
+                if (e.type === 'shield' && !a.isPierce && !a.isFire) {
+                  actualDmg = Math.floor(actualDmg * 0.35); // 巨盾減傷 65%
+                }
+
+                e.hp -= actualDmg;
+                this.showDamageText(actualDmg, e.group.position, a.isFire || a.isPierce);
+
+                if (e.hp <= 0) {
+                  this.scene.remove(e.group);
+                  this.enemies.splice(j, 1);
+                  sound.playExplode();
+                }
+                removeArrow = !a.isPierce;
+                if (removeArrow) break;
+              }
+            }
+          }
+
+          // (C) 檢測是否命中最終 Boss
+          if (!removeArrow && this.boss) {
             const bDist = Math.hypot(a.mesh.position.x - this.boss.position.x, a.mesh.position.z - this.boss.position.z);
-            if (bDist < 3.2) {
+            if (bDist < 3.4) {
               this.bossHp -= a.damage;
               this.showDamageText(a.damage, a.mesh.position, true);
               this.updateUI();
-              hit = true;
+              removeArrow = !a.isPierce;
 
               if (this.bossHp <= 0) {
                 this.winBossFight();
@@ -1732,25 +2012,27 @@
             }
           }
 
-          // 飛出射程移除
-          if (hit || a.mesh.position.z < -55) {
+          // 飛出射程
+          if (removeArrow || a.mesh.position.z < -this.worldZ - 60) {
             this.scene.remove(a.mesh);
             this.arrows.splice(i, 1);
           }
         }
 
-        // 敵軍小兵壓境
-        for (let i = this.redEnemies.length - 1; i >= 0; i--) {
-          const e = this.redEnemies[i];
-          e.mesh.position.z += e.speed;
-
-          // 敵兵突破防線撞入軍團
-          if (e.mesh.position.z > -1.0) {
-            this.armyCount = Math.max(0, this.armyCount - 3);
-            this.scene.remove(e.mesh);
-            this.redEnemies.splice(i, 1);
+        // 7. 敵兵壓境傷害
+        const armyFrontZ = -this.worldZ;
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+          const e = this.enemies[i];
+          if (e.group.position.z > armyFrontZ - 0.5) {
+            // 撞擊軍團
+            const lost = e.isMiniBoss ? 6 : (e.type === 'shield' ? 3 : 2);
+            this.armyCount = Math.max(0, this.armyCount - lost);
+            this.scene.remove(e.group);
+            this.enemies.splice(i, 1);
             this.rebuildArmyFormation();
             this.updateUI();
+            sound.playFall();
+
             if (this.armyCount <= 0) {
               this.loseGame();
               return;
@@ -1758,17 +2040,69 @@
           }
         }
 
-        // Boss 緩慢壓境與威脅
-        if (this.boss) {
-          const sway = Math.sin(now * 0.003) * 2.8;
+        // 8. 最終 Boss 戰鬥揮擊機制 (每隔 6 秒重擊揮擊一次！)
+        if (this.bossStageActive && this.boss) {
+          const sway = Math.sin(now * 0.0035) * 3.2;
           this.boss.position.x = sway;
-          this.boss.position.z = -38 + Math.min((now % 40000) / 1000 * 0.45, 24);
 
-          if (this.boss.position.z > -3.5) {
-            this.loseGame();
-            return;
+          // 揮擊衝擊波
+          if (now - this.bossLastAttackTime > 6000) {
+            this.bossLastAttackTime = now;
+            // 揮擊衝擊消滅前排 2 隻士兵
+            this.armyCount = Math.max(0, this.armyCount - 2);
+            this.rebuildArmyFormation();
+            this.updateUI();
+            sound.playFall();
+            this.showDamageText("BOSS 揮擊！-2", this.soldierGroup.position);
+
+            if (this.armyCount <= 0) {
+              this.loseGame();
+              return;
+            }
           }
         }
+      }
+
+      applyReward(config) {
+        if (config.type === 'add_soldier') {
+          this.armyCount += config.val;
+          if (this.armyCount > this.maxEverArmy) this.maxEverArmy = this.armyCount;
+          this.showBuffPopup(`+${config.val} 弓箭手`, this.soldierGroup.position);
+        } else if (config.type === 'revive_ratio') {
+          const dead = Math.max(0, this.maxEverArmy - this.armyCount);
+          const revive = Math.max(3, Math.floor(dead * config.ratio));
+          this.armyCount += revive;
+          this.showBuffPopup(`復活 +${revive} 士兵！`, this.soldierGroup.position);
+        }
+        this.rebuildArmyFormation();
+        this.updateUI();
+      }
+
+      applyWeapon(weaponType) {
+        if (weaponType === 'rapid') {
+          this.weaponBuff = {
+            type: 'rapid',
+            duration: performance.now() + 12000, // 持續 12 秒
+            ammo: 0,
+            name: '⚡ 連發疾風弓 (12s)'
+          };
+        } else if (weaponType === 'pierce') {
+          this.weaponBuff = {
+            type: 'pierce',
+            duration: 0,
+            ammo: 20, // 20 輪穿透箭
+            name: '🎯 貫穿強弩 (20發)'
+          };
+        } else if (weaponType === 'fire') {
+          this.weaponBuff = {
+            type: 'fire',
+            duration: 0,
+            ammo: 15, // 15 輪烈焰箭
+            name: '🔥 焚天烈焰箭 (15發)'
+          };
+        }
+        this.rebuildArmyFormation();
+        this.updateUI();
       }
 
       showDamageText(dmg, pos, isCrit = false) {
@@ -1781,7 +2115,7 @@
 
         const el = document.createElement('div');
         el.className = isCrit ? 'dmg-popup crit' : 'dmg-popup';
-        el.textContent = `-${dmg}`;
+        el.textContent = typeof dmg === 'number' ? `-${dmg}` : dmg;
         el.style.left = `${x + (Math.random() - 0.5) * 30}px`;
         el.style.top = `${y + (Math.random() - 0.5) * 20}px`;
         document.body.appendChild(el);
@@ -1796,14 +2130,17 @@
         el.style.left = `${window.innerWidth / 2}px`;
         el.style.top = `${window.innerHeight / 2}px`;
         document.body.appendChild(el);
-        setTimeout(() => el.remove(), 600);
+        setTimeout(() => el.remove(), 700);
       }
 
       updateUI() {
         const pct = Math.max(0, Math.min(100, (this.bossHp / this.bossMaxHp) * 100));
         this.bossHpBar.style.width = `${pct}%`;
         this.bossHpText.textContent = `${Math.max(0, this.bossHp)} / ${this.bossMaxHp}`;
-        this.armyCountBadge.textContent = `🏹 部隊戰力: ${this.armyCount}`;
+        
+        let weaponInfo = this.weaponBuff.name;
+        if (this.weaponBuff.ammo > 0) weaponInfo += ` [剩餘:${this.weaponBuff.ammo}]`;
+        this.armyCountBadge.innerHTML = `🏹 部隊: <b>${this.armyCount}</b> | 武器: <span style="color:#fde047;">${weaponInfo}</span>`;
       }
 
       winBossFight() {
