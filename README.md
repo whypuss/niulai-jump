@@ -30,7 +30,7 @@
 
 專案已封裝為原生 Android APK（Capacitor 離線 WebView 架構，零外部依賴，安裝後斷網可玩）：
 
-- 📥 **[點擊下載最新版 APK (v1.0.0)](https://github.com/agooxo-puss/niulai-jump/releases/download/v1.0.0/niulai-jump.apk)**
+- 📥 **[點擊下載最新版 APK (v1.0.0)](https://github.com/whypuss/niulai-jump/releases/download/v1.0.0/niulai-jump.apk)**
 - **套件名稱**：`com.whypuss.niulaijump`
 - **檔案大小**：`3.8 MB`
 - **相容性**：適配 Android 8.0+ 及現代 Android 旗艦機（如 Vivo X200 Pro 等）
