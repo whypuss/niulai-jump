@@ -1340,8 +1340,11 @@
         this.lastVolleyTime = 0;
         this.baseVolleyInterval = 220; // 初始射速慢
 
-        this.decisionSections = []; // 二選一叉路與分隔牆
-        this.enemies = []; // 敵人群體 (普通小兵、盾兵、精英小隊長)
+        this.decisionSections = [];
+        this.pickups = []; // 沿途高密度戰場拾取箱/物資
+        this.enemies = [];
+        this.pickups.forEach(p => this.scene.remove(p.group));
+        this.pickups = []; // 敵人群體 (普通小兵、盾兵、精英小隊長)
         this.boss = null;
         this.bossHp = 2000;
         this.bossMaxHp = 2000;
@@ -1450,6 +1453,8 @@
         this.arrows = [];
         this.enemies.forEach(e => this.scene.remove(e.group));
         this.enemies = [];
+        this.pickups.forEach(p => this.scene.remove(p.group));
+        this.pickups = [];
         this.decisionSections.forEach(d => {
           this.scene.remove(d.wall);
           this.scene.remove(d.leftGate.group);
@@ -1514,125 +1519,127 @@
 
       buildStageProgress() {
         // ==========================================
-        // 10 倍宏大攻城征程 (Z: 0 ~ -2400)
+        // 戰鬥密集無間斷！怪物主動進攻 + 海量物資 + 密集岔路
         // ==========================================
-        let currentZ = -15;
+        let z = -15;
 
-        // 【章節 1：邊境哨卡 (Z: -15 ~ -450)】
-        // 熱身部隊
-        this.spawnMobBatch(4, currentZ, 'normal', 30);
-        currentZ -= 35;
-
-        // 選擇 1: +5 士兵 vs 連發疾風弓 (200 HP)
-        this.createDecisionPoint(currentZ, {
+        // 【第 1 區：邊境前哨】
+        this.spawnMobBatch(4, z, 'normal', 30, 0.05); z -= 14;
+        this.spawnPickups(z); z -= 12;
+        this.spawnMobBatch(5, z, 'normal', 35, 0.05); z -= 16;
+        
+        // 選擇 1: +5 士兵 vs 連發弓 (180 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'add_soldier', val: 5, text: '+5 士兵' },
-          right: { type: 'weapon_orb', hp: 200, weapon: 'rapid', text: '連發弓 (200 HP)' }
+          right: { type: 'weapon_orb', hp: 180, weapon: 'rapid', text: '連發弓 (180 HP)' }
         });
-        currentZ -= 45;
+        z -= 24;
 
-        this.spawnMobBatch(8, currentZ, 'normal', 40);
-        currentZ -= 40;
-        this.spawnMobBatch(3, currentZ, 'shield', 160);
-        currentZ -= 45;
+        this.spawnMobBatch(7, z, 'fast', 28, 0.07); z -= 15;
+        this.spawnPickups(z); z -= 14;
+        this.spawnMobBatch(6, z, 'shield', 120, 0.04); z -= 18;
+        this.spawnPickups(z); z -= 15;
+        this.spawnMobBatch(8, z, 'normal', 45, 0.05); z -= 20;
 
-        // 選擇 2: +8 士兵 vs 貫穿強弩 (350 HP)
-        this.createDecisionPoint(currentZ, {
+        // 選擇 2: +8 士兵 vs 穿透箭 (280 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'add_soldier', val: 8, text: '+8 士兵' },
-          right: { type: 'weapon_orb', hp: 350, weapon: 'pierce', text: '穿透箭 (350 HP)' }
+          right: { type: 'weapon_orb', hp: 280, weapon: 'pierce', text: '穿透箭 (280 HP)' }
         });
-        currentZ -= 55;
+        z -= 28;
 
-        this.spawnMobBatch(12, currentZ, 'normal', 50);
-        currentZ -= 40;
+        this.spawnMobBatch(10, z, 'fast', 32, 0.075); z -= 18;
+        this.spawnPickups(z); z -= 16;
 
-        // ⚔️ 小 BOSS 1 登場：【獵豹先鋒小霸王】(主動向玩家奔襲！2500 HP)
-        this.spawnActiveMiniBoss(currentZ, 'leopard', 2500, "⚡ 獵豹先鋒·小BOSS", 0.05);
-        currentZ -= 70;
+        // ⚔️ 小 BOSS 1：【獵豹先鋒·小BOSS】(高速奔襲 3200 HP)
+        this.spawnActiveMiniBoss(z, 'leopard', 3200, "⚡ 狂暴獵豹·先鋒官", 0.065);
+        z -= 32;
 
-        // 選擇 3: 復活 40% 士兵 vs 焚天烈焰箭 (500 HP)
-        this.createDecisionPoint(currentZ, {
+        this.spawnPickups(z); z -= 15;
+        this.spawnMobBatch(8, z, 'normal', 45, 0.05); z -= 16;
+
+        // 選擇 3: 復活 40% 陣亡 vs 烈焰神箭 (400 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'revive_ratio', ratio: 0.4, text: '復活40%' },
-          right: { type: 'weapon_orb', hp: 500, weapon: 'fire', text: '火焰箭 (500 HP)' }
+          right: { type: 'weapon_orb', hp: 400, weapon: 'fire', text: '烈焰神箭 (400 HP)' }
         });
-        currentZ -= 60;
+        z -= 28;
 
-        // 【章節 2：重裝防線 (Z: -450 ~ -1050)】
-        this.spawnMobBatch(15, currentZ, 'normal', 65);
-        currentZ -= 45;
-        this.spawnMobBatch(6, currentZ, 'shield', 240);
-        currentZ -= 50;
+        // 【第 2 區：重裝要塞】
+        for (let i = 0; i < 4; i++) {
+          this.spawnMobBatch(10 + i * 2, z, 'normal', 55, 0.055); z -= 16;
+          this.spawnPickups(z); z -= 14;
+          this.spawnMobBatch(3 + i, z, 'shield', 180, 0.04); z -= 16;
+          this.spawnPickups(z); z -= 14;
+        }
 
-        // 選擇 4: +12 士兵 vs 狂風神弩 (650 HP)
-        this.createDecisionPoint(currentZ, {
+        // 選擇 4: +12 士兵 vs 極速狂弩 (550 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'add_soldier', val: 12, text: '+12 士兵' },
-          right: { type: 'weapon_orb', hp: 650, weapon: 'rapid', text: '極速連發 (650 HP)' }
+          right: { type: 'weapon_orb', hp: 550, weapon: 'rapid', text: '極速狂弩 (550 HP)' }
         });
-        currentZ -= 60;
+        z -= 28;
 
-        this.spawnMobBatch(20, currentZ, 'normal', 75);
-        currentZ -= 45;
-        this.spawnMobBatch(8, currentZ, 'shield', 280);
-        currentZ -= 50;
+        this.spawnMobBatch(14, z, 'fast', 45, 0.08); z -= 18;
+        this.spawnPickups(z); z -= 15;
 
-        // ⚔️ 小 BOSS 2 登場：【狂暴赤角戰牛·小BOSS】(沉重踏步衝擊！4800 HP)
-        this.spawnActiveMiniBoss(currentZ, 'bull', 4800, "🔥 赤角狂牛·小BOSS", 0.04);
-        currentZ -= 75;
+        // ⚔️ 小 BOSS 2：【赤角狂牛·小BOSS】(重步踏碎地面！6500 HP)
+        this.spawnActiveMiniBoss(z, 'bull', 6500, "🔥 崩山巨牛·先鋒官", 0.05);
+        z -= 35;
 
-        // 選擇 5: +16 士兵 vs 爆裂穿透箭 (800 HP)
-        this.createDecisionPoint(currentZ, {
+        this.spawnPickups(z); z -= 16;
+        this.spawnMobBatch(12, z, 'shield', 220, 0.04); z -= 18;
+
+        // 選擇 5: +16 士兵 vs 貫通天穹 (750 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'add_soldier', val: 16, text: '+16 士兵' },
-          right: { type: 'weapon_orb', hp: 800, weapon: 'pierce', text: '貫通神箭 (800 HP)' }
+          right: { type: 'weapon_orb', hp: 750, weapon: 'pierce', text: '貫通天穹 (750 HP)' }
         });
-        currentZ -= 65;
+        z -= 30;
 
-        // 【章節 3：幽冥毒霧關隘 (Z: -1050 ~ -1750)】
-        this.spawnMobBatch(24, currentZ, 'normal', 85);
-        currentZ -= 50;
-        this.spawnMobBatch(10, currentZ, 'shield', 320);
-        currentZ -= 55;
+        // 【第 3 區：蛇神毒瘴大道】
+        for (let i = 0; i < 5; i++) {
+          this.spawnMobBatch(12 + i * 3, z, 'fast', 50, 0.085); z -= 18;
+          this.spawnPickups(z); z -= 15;
+          this.spawnMobBatch(4 + i * 2, z, 'shield', 260, 0.045); z -= 18;
+          this.spawnPickups(z); z -= 15;
+        }
 
-        // 選擇 6: 復活 50% 陣亡士兵 vs 滅世烈焰 (1000 HP)
-        this.createDecisionPoint(currentZ, {
+        // ⚔️ 小 BOSS 3：【幽冥青蛇·小BOSS】(巨蛇蜿蜒游動 9800 HP)
+        this.spawnActiveMiniBoss(z, 'snake', 9800, "🐍 幽冥青蛇·大護法", 0.055);
+        z -= 38;
+
+        this.spawnPickups(z); z -= 16;
+
+        // 選擇 6: 復活 50% vs 滅世烈火 (1000 HP)
+        this.createDecisionPoint(z, {
           left: { type: 'revive_ratio', ratio: 0.5, text: '復活50%' },
-          right: { type: 'weapon_orb', hp: 1000, weapon: 'fire', text: '滅世烈焰 (1000 HP)' }
+          right: { type: 'weapon_orb', hp: 1000, weapon: 'fire', text: '滅世烈火 (1000 HP)' }
         });
-        currentZ -= 70;
+        z -= 32;
 
-        this.spawnMobBatch(30, currentZ, 'normal', 100);
-        currentZ -= 55;
+        // 【第 4 區：皇城兵團最後狂潮】
+        for (let i = 0; i < 6; i++) {
+          this.spawnMobBatch(16 + i * 2, z, 'normal', 70, 0.06); z -= 18;
+          this.spawnPickups(z); z -= 15;
+          this.spawnMobBatch(5 + i, z, 'fast', 55, 0.09); z -= 18;
+        }
 
-        // ⚔️ 小 BOSS 3 登場：【青蛇大護法·小BOSS】(蜿蜒大步逼近！7200 HP)
-        this.spawnActiveMiniBoss(currentZ, 'snake', 7200, "🐍 盤雲青蛇·小BOSS", 0.045);
-        currentZ -= 80;
-
-        // 選擇 7: +25 士兵 vs 傳奇神弓 (1300 HP)
-        this.createDecisionPoint(currentZ, {
-          left: { type: 'add_soldier', val: 25, text: '+25 弓箭手' },
-          right: { type: 'weapon_orb', hp: 1300, weapon: 'fire', text: '天劫神弓 (1300 HP)' }
+        // 終極大軍出征門
+        this.createDecisionPoint(z, {
+          left: { type: 'add_soldier', val: 30, text: '百夫長衝鋒 +30' },
+          right: { type: 'weapon_orb', hp: 1500, weapon: 'rapid', text: '滅神狂暴弓 (1500 HP)' }
         });
-        currentZ -= 75;
+        z -= 45;
 
-        // 【章節 4：皇城決戰大道 (Z: -1750 ~ -2200)】
-        this.spawnMobBatch(36, currentZ, 'normal', 120);
-        currentZ -= 60;
-        this.spawnMobBatch(14, currentZ, 'shield', 400);
-        currentZ -= 65;
-
-        // 決戰前最後補給站
-        this.createDecisionPoint(currentZ, {
-          left: { type: 'add_soldier', val: 35, text: '全軍衝鋒 +35' },
-          right: { type: 'weapon_orb', hp: 1600, weapon: 'rapid', text: '暴風箭雨 (1600 HP)' }
-        });
-        currentZ -= 85;
-
-        // 👑 最終壓軸大 BOSS 登場 (血量 28000 HP！血條超長，主動邁開巨足朝玩家大步碾壓走過來！)
-        this.prepareFinalBoss(currentZ);
+        // 👑 最終大 BOSS 降臨！
+        this.prepareFinalBoss(z);
       }
 
-      spawnMobBatch(count, zPos, mobType, hp) {
+      spawnMobBatch(count, zPos, mobType, hp, moveSpeed = 0.05) {
         const mat = mobType === 'shield'
           ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.4 })
-          : new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.6 });
+          : (mobType === 'fast' ? new THREE.MeshStandardMaterial({ color: 0xff0055, roughness: 0.3 }) : new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.6 }));
 
         for (let i = 0; i < count; i++) {
           const g = new THREE.Group();
@@ -1642,15 +1649,19 @@
           g.add(body);
 
           if (mobType === 'shield') {
-            // 正面高防巨盾
             const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.3 });
             const shield = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.15), shieldMat);
             shield.position.set(0, 0.6, 0.45);
             g.add(shield);
+          } else if (mobType === 'fast') {
+            // 疾跑刺客小兵（頭頂雙角）
+            const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 4), new THREE.MeshBasicMaterial({ color: 0xffdd00 }));
+            horn.position.set(0, 1.25, 0);
+            g.add(horn);
           }
 
-          const spread = Math.min(10, count * 1.4);
-          const x = (i - (count - 1) / 2) * (spread / Math.max(1, count - 1));
+          const spread = Math.min(11, count * 1.3);
+          const x = (i - (count - 1) / 2) * (spread / Math.max(1, count - 1)) + (Math.random() - 0.5) * 0.4;
           g.position.set(x, 0, zPos);
           this.scene.add(g);
 
@@ -1660,6 +1671,7 @@
             hp: hp,
             maxHp: hp,
             z: zPos,
+            moveSpeed: moveSpeed, // 所有敵人都主動大步走過來！
             isMiniBoss: false
           });
         }
@@ -1714,6 +1726,45 @@
           maxHp: hp,
           z: zPos,
           isMiniBoss: true
+        });
+      }
+
+            spawnPickups(zPos) {
+        // 沿途頻繁放置金幣箱/補給箱/彈藥球，絕無無聊空白時間！
+        const types = ['heal', 'ammo', 'gold'];
+        const pType = types[Math.floor(Math.random() * types.length)];
+        const xPos = (Math.random() - 0.5) * 8.5;
+
+        const g = new THREE.Group();
+        g.position.set(xPos, 0.6, zPos);
+
+        if (pType === 'heal') {
+          // 醫療十字補給箱 (+3 士兵)
+          const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+          const cross = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.95, 0.3), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          g.add(box); g.add(cross); g.add(crossV);
+        } else if (pType === 'ammo') {
+          // 狂暴彈藥箱 (增加武器彈藥/攻速)
+          const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.5 }));
+          const orb = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+          orb.position.y = 0.7;
+          g.add(box); g.add(orb);
+        } else {
+          // 旋轉金幣/戰力符文 (+2 士兵)
+          const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.15, 16), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8, roughness: 0.2 }));
+          coin.rotation.x = Math.PI / 2;
+          coin.position.y = 0.4;
+          g.add(coin);
+        }
+
+        this.scene.add(g);
+        this.pickups.push({
+          group: g,
+          type: pType,
+          z: zPos,
+          x: xPos,
+          collected: false
         });
       }
 
@@ -2145,12 +2196,48 @@
           }
         }
 
-        // 小 Boss 主動走向玩家踏步推進！
+        // 所有敵怪（普通兵、盾兵、疾跑兵、小Boss）都主動迎面走來進攻！
         for (let e of this.enemies) {
+          if (e.moveSpeed) {
+            e.group.position.z += e.moveSpeed; // 主動迎面大步走過來！
+          }
           if (e.type === 'active_miniboss') {
-            e.group.position.z += e.moveSpeed; // 主動迎面走來！
-            // 左右霸氣橫晃
-            e.group.position.x = Math.sin(now * 0.002 + e.z) * 2.2;
+            e.group.position.x = Math.sin(now * 0.002 + e.z) * 2.5;
+          } else if (e.type === 'fast') {
+            // 疾跑刺客小蛇形突進
+            e.group.position.x += Math.sin(now * 0.006 + e.group.position.z) * 0.06;
+          }
+        }
+
+        // 沿途物資箱 (pickups) 旋轉與拾取檢測
+        const curZ = -this.worldZ;
+        for (let i = this.pickups.length - 1; i >= 0; i--) {
+          const p = this.pickups[i];
+          p.group.rotation.y += 0.03;
+          // 檢測軍團是否經過
+          if (Math.abs(curZ - p.z) < 1.6 && Math.abs(this.armyCenterX - p.x) < 2.5) {
+            if (p.type === 'heal') {
+              this.armyCount += 3;
+              if (this.armyCount > this.maxEverArmy) this.maxEverArmy = this.armyCount;
+              this.showBuffPopup("醫療補給 +3 士兵！", p.group.position);
+              sound.playPerfect(1);
+            } else if (p.type === 'ammo') {
+              if (this.weaponBuff.ammo > 0) this.weaponBuff.ammo += 15;
+              this.showBuffPopup("補給彈藥 +15！", p.group.position);
+              sound.playPerfect(2);
+            } else {
+              this.armyCount += 2;
+              this.showBuffPopup("部隊士氣 +2！", p.group.position);
+              sound.playPerfect(1);
+            }
+            this.scene.remove(p.group);
+            this.pickups.splice(i, 1);
+            this.rebuildArmyFormation();
+            this.updateUI();
+          } else if (p.z > curZ + 15) {
+            // 超出視野後清理
+            this.scene.remove(p.group);
+            this.pickups.splice(i, 1);
           }
         }
 
