@@ -284,6 +284,136 @@
       border-radius: 50%;
       background: #ffb300;
     }
+  
+    /* 《最強領主》割草射擊副本 UI 樣式 */
+    #lord-ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+      z-index: 20;
+    }
+    .lord-header {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .lord-banner {
+      background: linear-gradient(90deg, #ff416c, #ff4b2b);
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(255, 75, 43, 0.4);
+      animation: pulse 1.2s infinite alternate;
+    }
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+    .lord-boss-title {
+      font-size: 18px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      letter-spacing: 0.5px;
+    }
+    .lord-hp-bar-bg {
+      width: 100%;
+      height: 16px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid #ff4b2b;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 0 12px rgba(255, 75, 43, 0.5);
+    }
+    .lord-hp-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff0844, #ffb199);
+      transition: width 0.1s linear;
+    }
+    .lord-hp-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 1px 3px #000;
+    }
+    .lord-tip {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.55);
+      color: #00f0ff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    .dmg-popup {
+      position: absolute;
+      font-size: 18px;
+      font-weight: 900;
+      color: #ff3366;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+      pointer-events: none;
+      animation: floatDamage 0.45s ease-out forwards;
+      z-index: 30;
+      font-family: Arial, sans-serif;
+    }
+    .dmg-popup.crit {
+      font-size: 24px;
+      color: #ffd700;
+      text-shadow: 0 0 8px #ff4500, 0 2px 4px #000;
+    }
+    @keyframes floatDamage {
+      0% { opacity: 1; transform: translateY(0) scale(0.8); }
+      50% { opacity: 1; transform: translateY(-18px) scale(1.2); }
+      100% { opacity: 0; transform: translateY(-34px) scale(1); }
+    }
+    .lord-revive-banner {
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #00b09b, #96c93d);
+      color: #fff;
+      padding: 16px 36px;
+      border-radius: 28px;
+      font-size: 22px;
+      font-weight: 900;
+      box-shadow: 0 10px 30px rgba(0, 176, 155, 0.6);
+      display: none;
+      z-index: 40;
+      text-align: center;
+      border: 2px solid #fff;
+      animation: popBanner 0.4s ease-out;
+    }
+    @keyframes popBanner {
+      0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
   </style>
   <!-- 優先載入本地離線資源，極速秒開無延遲 -->
   <script src="vendor/three.min.js"></script>
@@ -332,6 +462,21 @@
     <div class="instruction-hint" id="instruction-hint">
       <span>👆</span> 長按螢幕蓄力，鬆開放手跳躍
     </div>
+  </div>
+
+  
+  <!-- 《最強領主》割草射擊 UI 浮層 -->
+  <div id="lord-ui">
+    <div class="lord-header">
+      <div class="lord-banner">⚔️ 跌落深淵！《最強領主》突圍戰 ⚔️</div>
+      <div class="lord-boss-title" id="lord-boss-name">⚡ 狂暴獵豹 BOSS</div>
+      <div class="lord-hp-bar-bg">
+        <div class="lord-hp-bar-fill" id="lord-boss-hp-fill"></div>
+        <div class="lord-hp-text" id="lord-boss-hp-text">1000 / 1000</div>
+      </div>
+    </div>
+    <div class="lord-tip">👈 左右拖動操控牛來 閃避並自動射擊 👉</div>
+    <div class="lord-revive-banner" id="lord-revive-notice">🏆 領主討伐成功！原地復活！</div>
   </div>
 
   <!-- 結算彈窗 -->
@@ -446,6 +591,73 @@
           gain.connect(this.ctx.destination);
           osc.start();
           osc.stop(this.ctx.currentTime + 0.45);
+        } catch(e) {}
+      }
+      playLaser() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.08);
+        } catch(e) {}
+      }
+      playExplode() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.18);
+          gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.2);
+        } catch(e) {}
+      }
+      playBossAlarm() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+          osc.frequency.setValueAtTime(480, this.ctx.currentTime + 0.15);
+          osc.frequency.setValueAtTime(320, this.ctx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.45);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.45);
+        } catch(e) {}
+      }
+      playWinFanfare() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C E G C
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(this.ctx.currentTime + idx * 0.1);
+            osc.stop(this.ctx.currentTime + idx * 0.1 + 0.25);
+          });
         } catch(e) {}
       }
       playFall() {
@@ -783,6 +995,652 @@
     }
 
     // ==========================================
+    // 2.5 《最強領主》割草射擊 Boss 模型構建系統
+    // ==========================================
+    function createLeopardBossModel() {
+      // 豹 Boss (參照圖二：黃底黑斑、尖耳、矯健獵豹頭身與長尾)
+      const group = new THREE.Group();
+      group.name = "Boss_Leopard";
+
+      const yellowMat = new THREE.MeshStandardMaterial({ color: 0xee9b00, roughness: 0.6 });
+      const spotMat = new THREE.MeshStandardMaterial({ color: 0x221200, roughness: 0.8 });
+      const bellyMat = new THREE.MeshStandardMaterial({ color: 0xffe8d6, roughness: 0.5 });
+      const toothMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+
+      // 身軀
+      const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 3.6), yellowMat);
+      body.position.y = 1.6;
+      body.castShadow = true;
+      group.add(body);
+
+      // 肚皮
+      const belly = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 3.2), bellyMat);
+      belly.rotation.x = Math.PI / 2;
+      belly.position.set(0, 0.69, 0);
+      group.add(belly);
+
+      // 獵豹斑點 (身上多個黑斑)
+      for (let i = 0; i < 14; i++) {
+        const spot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 8), spotMat);
+        const side = i % 2 === 0 ? 1.21 : -1.21;
+        spot.rotation.z = Math.PI / 2;
+        spot.position.set(side, 1.2 + (i % 4) * 0.3, -1.3 + (Math.floor(i / 2) * 0.45));
+        group.add(spot);
+      }
+
+      // 豹頭
+      const head = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.6, 1.9), yellowMat);
+      head.position.set(0, 2.2, 2.2);
+      head.castShadow = true;
+      group.add(head);
+
+      // 豹吻部
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.9), bellyMat);
+      snout.position.set(0, 1.85, 3.2);
+      group.add(snout);
+
+      // 鼻子
+      const nose = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.2), spotMat);
+      nose.position.set(0, 2.1, 3.7);
+      group.add(nose);
+
+      // 獠牙
+      const t1 = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.35, 4), toothMat);
+      t1.rotation.x = Math.PI;
+      t1.position.set(-0.35, 1.45, 3.3);
+      const t2 = t1.clone();
+      t2.position.set(0.35, 1.45, 3.3);
+      group.add(t1);
+      group.add(t2);
+
+      // 豹耳 (三角形)
+      const ear1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 4), yellowMat);
+      ear1.rotation.y = Math.PI / 4;
+      ear1.position.set(-0.7, 3.2, 2.0);
+      const ear2 = ear1.clone();
+      ear2.position.set(0.7, 3.2, 2.0);
+      group.add(ear1);
+      group.add(ear2);
+
+      // 翡翠綠雙眼
+      const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.1), eyeMat);
+      eye1.position.set(-0.55, 2.35, 3.16);
+      const eye2 = eye1.clone();
+      eye2.position.set(0.55, 2.35, 3.16);
+      group.add(eye1);
+      group.add(eye2);
+
+      // 四肢
+      const legGeo = new THREE.BoxGeometry(0.65, 1.3, 0.65);
+      const legPositions = [
+        [-0.9, 0.65, 1.2],
+        [0.9, 0.65, 1.2],
+        [-0.9, 0.65, -1.2],
+        [0.9, 0.65, -1.2]
+      ];
+      legPositions.forEach(p => {
+        const leg = new THREE.Mesh(legGeo, yellowMat);
+        leg.position.set(...p);
+        leg.castShadow = true;
+        group.add(leg);
+      });
+
+      // 獵豹長尾巴
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 2.2, 8), yellowMat);
+      tail.position.set(0, 2.0, -2.4);
+      tail.rotation.x = Math.PI / 3;
+      group.add(tail);
+
+      group.scale.set(1.4, 1.4, 1.4);
+      return group;
+    }
+
+    function createBigBullBossModel() {
+      // 大牛 Boss (凶狠紅色戰牛、金色巨角、鼻環)
+      const group = new THREE.Group();
+      group.name = "Boss_BigBull";
+
+      const bullMat = new THREE.MeshStandardMaterial({ color: 0x9b111e, roughness: 0.6 });
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x4a0e17, roughness: 0.7 });
+      const goldHornMat = new THREE.MeshStandardMaterial({ color: 0xf5b722, metalness: 0.6, roughness: 0.3 });
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0xffdd53, metalness: 0.8, roughness: 0.2 });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff1100 });
+
+      // 壯碩龐大軀幹
+      const body = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.4, 4.0), bullMat);
+      body.position.y = 2.0;
+      body.castShadow = true;
+      group.add(body);
+
+      // 背部隆肉 (Hump)
+      const hump = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 1.8), darkMat);
+      hump.position.set(0, 3.4, 0.8);
+      group.add(hump);
+
+      // 牛頭
+      const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 2.4), bullMat);
+      head.position.set(0, 2.7, 2.6);
+      head.castShadow = true;
+      group.add(head);
+
+      // 巨大金色牛角 (左右橫展向上)
+      const hornGeo = new THREE.CylinderGeometry(0.15, 0.45, 2.2, 16);
+      const hornLeft = new THREE.Mesh(hornGeo, goldHornMat);
+      hornLeft.position.set(-1.8, 3.8, 2.2);
+      hornLeft.rotation.z = Math.PI / 3;
+      hornLeft.rotation.y = -Math.PI / 6;
+
+      const hornRight = new THREE.Mesh(hornGeo, goldHornMat);
+      hornRight.position.set(1.8, 3.8, 2.2);
+      hornRight.rotation.z = -Math.PI / 3;
+      hornRight.rotation.y = Math.PI / 6;
+
+      group.add(hornLeft);
+      group.add(hornRight);
+
+      // 厚嘴吻部
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 1.2), darkMat);
+      snout.position.set(0, 2.1, 3.8);
+      group.add(snout);
+
+      // 金色大鼻環
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.08, 12, 24), ringMat);
+      ring.position.set(0, 1.6, 4.2);
+      ring.rotation.x = Math.PI / 4;
+      group.add(ring);
+
+      // 赤紅雙目
+      const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.1), eyeMat);
+      eye1.position.set(-0.75, 2.9, 3.82);
+      const eye2 = eye1.clone();
+      eye2.position.set(0.75, 2.9, 3.82);
+      group.add(eye1);
+      group.add(eye2);
+
+      // 粗壯牛腿
+      const legGeo = new THREE.BoxGeometry(0.9, 1.4, 0.9);
+      const legPositions = [
+        [-1.1, 0.7, 1.4],
+        [1.1, 0.7, 1.4],
+        [-1.1, 0.7, -1.4],
+        [1.1, 0.7, -1.4]
+      ];
+      legPositions.forEach(p => {
+        const leg = new THREE.Mesh(legGeo, darkMat);
+        leg.position.set(...p);
+        leg.castShadow = true;
+        group.add(leg);
+      });
+
+      group.scale.set(1.3, 1.3, 1.3);
+      return group;
+    }
+
+    function createGreenSnakeBossModel() {
+      // 青蛇 Boss (蜿蜒青色巨蟒、蛇冠、信子、陰森豎瞳)
+      const group = new THREE.Group();
+      group.name = "Boss_GreenSnake";
+
+      const snakeMat = new THREE.MeshStandardMaterial({ color: 0x1b9aaa, roughness: 0.4 });
+      const bellyMat = new THREE.MeshStandardMaterial({ color: 0x9bf6ff, roughness: 0.5 });
+      const tongueMat = new THREE.MeshStandardMaterial({ color: 0xff0054, roughness: 0.3 });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
+
+      // 蛇身節段 (盤旋立起)
+      const segments = 9;
+      for (let i = 0; i < segments; i++) {
+        const radius = 1.3 - (i * 0.09);
+        const seg = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.9, radius, 0.7, 16), snakeMat);
+        // S形蛇身起伏
+        const offsetX = Math.sin(i * 0.8) * 0.9;
+        const offsetZ = -i * 0.7;
+        seg.position.set(offsetX, 0.35 + i * 0.55, offsetZ);
+        seg.rotation.x = 0.3;
+        seg.rotation.z = Math.cos(i * 0.8) * 0.2;
+        seg.castShadow = true;
+        group.add(seg);
+      }
+
+      // 昂起的蛇首
+      const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.4, 2.6), snakeMat);
+      head.position.set(0, 5.2, 0.6);
+      head.rotation.x = -0.15;
+      head.castShadow = true;
+      group.add(head);
+
+      // 蛇下巴/腹面
+      const underJaw = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 2.2), bellyMat);
+      underJaw.position.set(0, 4.6, 0.6);
+      group.add(underJaw);
+
+      // 黃色蛇眼豎瞳
+      const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.1), eyeMat);
+      eye1.position.set(-0.95, 5.3, 1.5);
+      const pupil1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.12), new THREE.MeshBasicMaterial({ color: 0x000 }));
+      pupil1.position.copy(eye1.position);
+      const eye2 = eye1.clone();
+      eye2.position.set(0.95, 5.3, 1.5);
+      const pupil2 = pupil1.clone();
+      pupil2.position.copy(eye2.position);
+      group.add(eye1); group.add(pupil1);
+      group.add(eye2); group.add(pupil2);
+
+      // 分叉紅信子 (Tongue)
+      const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 1.4), tongueMat);
+      tongue.position.set(0, 4.8, 2.3);
+      group.add(tongue);
+
+      // 蛇頂刺冠
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 4), bellyMat);
+      crest.position.set(0, 6.1, 0.4);
+      crest.rotation.x = -Math.PI / 6;
+      group.add(crest);
+
+      group.scale.set(1.2, 1.2, 1.2);
+      return group;
+    }
+
+    function createMinionModel() {
+      // 《最強領主》經典紅色小嘍囉 (雜兵)
+      const group = new THREE.Group();
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.5 });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.1, 0.75), redMat);
+      body.position.y = 0.55;
+      body.castShadow = true;
+      group.add(body);
+
+      const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.08), eyeMat);
+      eye1.position.set(-0.2, 0.85, 0.38);
+      const eye2 = eye1.clone();
+      eye2.position.set(0.2, 0.85, 0.38);
+      group.add(eye1); group.add(eye2);
+
+      return group;
+    }
+
+    // ==========================================
+    // 2.6 《最強領主》割草射擊副本控制器 (LordShooterMode)
+    // ==========================================
+    class LordShooterMode {
+      constructor(game) {
+        this.game = game;
+        this.active = false;
+        
+        // 專屬射擊透視相機
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+        this.camera.position.set(0, 10, 16);
+        this.camera.lookAt(0, 2, -6);
+
+        // 專屬場景
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x181e28); // 領主深邃戰場夜色
+        this.scene.fog = new THREE.FogExp2(0x181e28, 0.015);
+
+        // 燈光
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.8);
+        this.scene.add(hemi);
+        const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+        dir.position.set(10, 25, 15);
+        dir.castShadow = true;
+        this.scene.add(dir);
+
+        // 跑道戰場
+        this.trackWidth = 14;
+        this.trackLength = 120;
+        this.createBattleGround();
+
+        // 實體管理
+        this.player = null;
+        this.playerX = 0;
+        this.targetPlayerX = 0;
+        this.bullets = [];
+        this.enemies = [];
+        this.boss = null;
+        this.particles = [];
+        this.floatingTexts = [];
+
+        // 數值與狀態
+        this.bossMaxHp = 1000;
+        this.bossHp = 1000;
+        this.bossType = 'leopard'; // leopard, bull, snake
+        this.lastShootTime = 0;
+        this.shootInterval = 110; // 毫秒高頻射擊
+        this.bulletPower = 35;
+        this.fireCount = 2; // 雙聯發
+
+        this.isPointerDown = false;
+        this.pointerStartX = 0;
+        this.playerStartX = 0;
+
+        // UI 元素
+        this.uiLayer = document.getElementById('lord-ui');
+        this.bossHpBar = document.getElementById('lord-boss-hp-fill');
+        this.bossHpText = document.getElementById('lord-boss-hp-text');
+        this.bossNameText = document.getElementById('lord-boss-name');
+        this.reviveNotice = document.getElementById('lord-revive-notice');
+
+        this.initControls();
+      }
+
+      createBattleGround() {
+        // 戰鬥跑道地貌
+        const groundGeo = new THREE.PlaneGeometry(this.trackWidth, this.trackLength, 20, 40);
+        const groundMat = new THREE.MeshStandardMaterial({
+          color: 0x242d3d,
+          roughness: 0.8,
+          metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(0, 0, -this.trackLength / 2 + 10);
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+
+        // 兩側科技發光邊界牆
+        const wallMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff });
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, this.trackLength), wallMat);
+        leftWall.position.set(-this.trackWidth / 2, 0.4, ground.position.z);
+        const rightWall = leftWall.clone();
+        rightWall.position.set(this.trackWidth / 2, 0.4, ground.position.z);
+        this.scene.add(leftWall);
+        this.scene.add(rightWall);
+
+        // 跑道格線 (領主數值格線)
+        const grid = new THREE.GridHelper(this.trackLength, 40, 0x00ffff, 0x334455);
+        grid.position.set(0, 0.05, ground.position.z);
+        grid.scale.x = this.trackWidth / this.trackLength;
+        this.scene.add(grid);
+      }
+
+      initControls() {
+        const onDown = (clientX) => {
+          if (!this.active) return;
+          this.isPointerDown = true;
+          this.pointerStartX = clientX;
+          this.playerStartX = this.playerX;
+        };
+
+        const onMove = (clientX) => {
+          if (!this.active || !this.isPointerDown) return;
+          const deltaX = (clientX - this.pointerStartX) / (window.innerWidth * 0.4);
+          const limit = (this.trackWidth / 2) - 1.2;
+          this.targetPlayerX = Math.max(-limit, Math.min(limit, this.playerStartX + deltaX * 10));
+        };
+
+        const onUp = () => {
+          this.isPointerDown = false;
+        };
+
+        window.addEventListener('mousedown', (e) => onDown(e.clientX));
+        window.addEventListener('mousemove', (e) => onMove(e.clientX));
+        window.addEventListener('mouseup', onUp);
+
+        window.addEventListener('touchstart', (e) => {
+          if (e.touches.length > 0) onDown(e.touches[0].clientX);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) {
+            onMove(e.touches[0].clientX);
+            if (this.active) e.preventDefault();
+          }
+        }, { passive: false });
+
+        window.addEventListener('touchend', onUp);
+      }
+
+      start(failBlockPos) {
+        this.active = true;
+        this.savedBlockPos = failBlockPos.clone();
+
+        // 隱藏跳一跳 UI，開啟領主 UI
+        document.getElementById('ui-overlay').style.display = 'none';
+        this.uiLayer.style.display = 'block';
+        this.reviveNotice.style.display = 'none';
+
+        // 隨機選擇 Boss
+        const bosses = ['leopard', 'bull', 'snake'];
+        this.bossType = bosses[Math.floor(Math.random() * bosses.length)];
+
+        // 清空舊實體
+        if (this.boss) this.scene.remove(this.boss);
+        if (this.player) this.scene.remove(this.player);
+        this.enemies.forEach(e => this.scene.remove(e.mesh));
+        this.bullets.forEach(b => this.scene.remove(b.mesh));
+        this.enemies = [];
+        this.bullets = [];
+
+        // 生成主角牛來 (拿槍射擊 pose)
+        this.player = createNiulaiCowModel();
+        this.player.scale.set(0.8, 0.8, 0.8);
+        this.player.position.set(0, 0.7, 4);
+        this.player.rotation.y = Math.PI; // 背對鏡頭向前射擊
+        this.scene.add(this.player);
+        this.playerX = 0;
+        this.targetPlayerX = 0;
+
+        // 生成 Boss
+        let bossName = "獵豹領主";
+        if (this.bossType === 'leopard') {
+          this.boss = createLeopardBossModel();
+          this.bossMaxHp = 1200;
+          bossName = "⚡ 狂暴獵豹 BOSS";
+        } else if (this.bossType === 'bull') {
+          this.boss = createBigBullBossModel();
+          this.bossMaxHp = 1800;
+          bossName = "🔥 狂暴大戰牛 BOSS";
+        } else {
+          this.boss = createGreenSnakeBossModel();
+          this.bossMaxHp = 1400;
+          bossName = "🐍 幽冥青蛇王 BOSS";
+        }
+        this.bossHp = this.bossMaxHp;
+        this.bossNameText.textContent = bossName;
+        this.boss.position.set(0, 0, -32);
+        this.scene.add(this.boss);
+
+        // 生成一波雜兵（小紅怪）護衛
+        for (let i = 0; i < 12; i++) {
+          const m = createMinionModel();
+          const row = Math.floor(i / 4);
+          const col = i % 4;
+          m.position.set((col - 1.5) * 2.6, 0, -12 - row * 5.5);
+          this.scene.add(m);
+          this.enemies.push({
+            mesh: m,
+            hp: 120,
+            maxHp: 120,
+            speed: 0.05 + Math.random() * 0.03
+          });
+        }
+
+        this.updateBossHpBar();
+        sound.playBossAlarm();
+      }
+
+      spawnBullet() {
+        // 雙聯發高能割草子彈
+        const offsets = [-0.4, 0.4];
+        offsets.forEach(ox => {
+          const geo = new THREE.CylinderGeometry(0.12, 0.12, 0.9, 8);
+          const mat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+          const b = new THREE.Mesh(geo, mat);
+          b.rotation.x = Math.PI / 2;
+          b.position.set(this.player.position.x + ox, 1.2, this.player.position.z - 0.8);
+          this.scene.add(b);
+          this.bullets.push({
+            mesh: b,
+            speed: 1.6,
+            damage: this.bulletPower
+          });
+        });
+        sound.playLaser();
+      }
+
+      update(now, delta) {
+        if (!this.active) return;
+
+        // 平滑橫向移動
+        this.playerX += (this.targetPlayerX - this.playerX) * 0.22;
+        this.player.position.x = this.playerX;
+        this.camera.position.x = this.playerX * 0.35;
+
+        // 奔跑與呼吸動態
+        const runWobble = Math.sin(now * 0.02) * 0.08;
+        this.player.position.y = 0.7 + Math.abs(runWobble);
+        this.player.rotation.z = -runWobble * 0.4;
+
+        // 自動高頻射擊
+        if (now - this.lastShootTime > this.shootInterval) {
+          this.spawnBullet();
+          this.lastShootTime = now;
+        }
+
+        // 更新子彈
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+          const b = this.bullets[i];
+          b.mesh.position.z -= b.speed;
+
+          // 命中雜兵檢測
+          let hit = false;
+          for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const e = this.enemies[j];
+            const dist = Math.hypot(b.mesh.position.x - e.mesh.position.x, b.mesh.position.z - e.mesh.position.z);
+            if (dist < 1.1) {
+              e.hp -= b.damage;
+              this.showDamageText(b.damage, e.mesh.position);
+              this.createHitSparks(e.mesh.position, 0x00d2ff);
+              if (e.hp <= 0) {
+                this.scene.remove(e.mesh);
+                this.enemies.splice(j, 1);
+                sound.playExplode();
+              }
+              hit = true;
+              break;
+            }
+          }
+
+          // 命中 Boss 檢測
+          if (!hit && this.boss) {
+            const bDist = Math.hypot(b.mesh.position.x - this.boss.position.x, b.mesh.position.z - this.boss.position.z);
+            if (bDist < 3.2) {
+              this.bossHp -= b.damage;
+              this.showDamageText(b.damage, b.mesh.position, true);
+              this.createHitSparks(b.mesh.position, 0xffaa00);
+              this.updateBossHpBar();
+              hit = true;
+
+              if (this.bossHp <= 0) {
+                this.winBossFight();
+                return;
+              }
+            }
+          }
+
+          // 超出屏幕移除
+          if (hit || b.mesh.position.z < -45) {
+            this.scene.remove(b.mesh);
+            this.bullets.splice(i, 1);
+          }
+        }
+
+        // 雜兵前進與威脅
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+          const e = this.enemies[i];
+          e.mesh.position.z += e.speed;
+
+          // 雜兵逼近牛來 -> 失敗
+          if (e.mesh.position.z > 3.2 && Math.abs(e.mesh.position.x - this.player.position.x) < 1.3) {
+            this.loseGame();
+            return;
+          }
+        }
+
+        // Boss 攻擊與震盪
+        if (this.boss) {
+          const sway = Math.sin(now * 0.003) * 2.8;
+          this.boss.position.x = sway;
+          // Boss 緩慢壓境
+          this.boss.position.z = -32 + Math.min((now % 30000) / 1000 * 0.35, 18);
+
+          if (this.boss.position.z > 2.5) {
+            this.loseGame();
+            return;
+          }
+        }
+      }
+
+      createHitSparks(pos, colorHex) {
+        // 命中粒子反饋
+        for (let i = 0; i < 4; i++) {
+          const p = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.12, 0.12),
+            new THREE.MeshBasicMaterial({ color: colorHex })
+          );
+          p.position.copy(pos);
+          p.position.x += (Math.random() - 0.5) * 0.5;
+          p.position.y += Math.random() * 0.8;
+          p.position.z += (Math.random() - 0.5) * 0.5;
+          this.scene.add(p);
+          setTimeout(() => this.scene.remove(p), 180);
+        }
+      }
+
+      showDamageText(dmg, pos, isCrit = false) {
+        const screenPos = pos.clone();
+        screenPos.y += 1.5;
+        screenPos.project(this.camera);
+
+        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+
+        const el = document.createElement('div');
+        el.className = isCrit ? 'dmg-popup crit' : 'dmg-popup';
+        el.textContent = `-${dmg}`;
+        el.style.left = `${x + (Math.random() - 0.5) * 40}px`;
+        el.style.top = `${y + (Math.random() - 0.5) * 20}px`;
+        document.body.appendChild(el);
+
+        setTimeout(() => el.remove(), 450);
+      }
+
+      updateBossHpBar() {
+        const pct = Math.max(0, Math.min(100, (this.bossHp / this.bossMaxHp) * 100));
+        this.bossHpBar.style.width = `${pct}%`;
+        this.bossHpText.textContent = `${Math.max(0, this.bossHp)} / ${this.bossMaxHp}`;
+      }
+
+      winBossFight() {
+        this.active = false;
+        sound.playWinFanfare();
+
+        // 領主通關特效
+        this.reviveNotice.textContent = "🏆 領主討伐成功！原位復活！";
+        this.reviveNotice.style.display = 'block';
+
+        setTimeout(() => {
+          this.uiLayer.style.display = 'none';
+          document.getElementById('ui-overlay').style.display = 'flex';
+          this.reviveNotice.style.display = 'none';
+          // 返回跳一跳原位置
+          this.game.reviveFromLord(this.savedBlockPos);
+        }, 1200);
+      }
+
+      loseGame() {
+        this.active = false;
+        sound.playFall();
+        this.uiLayer.style.display = 'none';
+        document.getElementById('ui-overlay').style.display = 'flex';
+        // 領主小遊戲失敗 -> 真正的 Game Over
+        this.game.finalizeGameOver();
+      }
+    }
+
+    // ==========================================
     // 3. 多元化方塊產生系統 (跳一跳特色幾何方塊)
     // ==========================================
     // 包含：圖一經典粉紅禮物盒、白色表情萌物盒、灰色小白點盒、綠色小圓柱等
@@ -962,6 +1820,8 @@
         this.nextDirection = new THREE.Vector3(1, 0, 0); // 隨機 X 或 Z 方向
 
         this.blockFactory = new BlockFactory();
+        this.lordShooter = new LordShooterMode(this);
+
 
         this.initThree();
         this.initLights();
@@ -1340,34 +2200,74 @@
       }
 
       triggerGameOver(cowX, cowZ, nearestBlock) {
-        this.state = 'GAMEOVER';
+        this.state = 'FALLING_TO_LORD';
         sound.playFall();
 
-        // 摔落物理旋轉動畫
+        // 記錄失敗前所在的方塊位置（用於打贏後原地復活）
+        const lastBlock = this.blocks[this.currentBlockIndex];
+        this.lastSavedBlockPos = lastBlock ? lastBlock.position.clone() : new THREE.Vector3(0, 0, 0);
+
+        // 摔落物理旋轉動畫，穿過虛空掉入《最強領主》世界
         const startY = this.cow.position.y;
         const start = performance.now();
         const fallAnim = (now) => {
-          const t = (now - start) / 600;
+          const t = (now - start) / 700;
           if (t <= 1) {
-            this.cow.position.y = startY - t * t * 14;
-            this.cow.rotation.x += 0.08;
-            this.cow.rotation.z += 0.06;
+            this.cow.position.y = startY - t * t * 25;
+            this.cow.rotation.x += 0.12;
+            this.cow.rotation.z += 0.09;
             requestAnimationFrame(fallAnim);
           }
         };
         requestAnimationFrame(fallAnim);
 
-        // 結算最高分
+        // 掉落深淵後無縫切換到《最強領主》割草射擊 Boss 戰
+        setTimeout(() => {
+          this.state = 'IN_LORD';
+          this.lordShooter.start(this.lastSavedBlockPos);
+        }, 750);
+      }
+
+      reviveFromLord(savedBlockPos) {
+        // 領主戰獲勝！原位復活，繼續跳一跳！
+        this.state = 'LANDED';
+        const curBlock = this.blocks[this.currentBlockIndex];
+        const blockY = curBlock ? curBlock.userData.height / 2 + 0.05 : 0.75;
+
+        this.cow.position.set(savedBlockPos.x, blockY + 6.0, savedBlockPos.z);
+        this.cow.rotation.set(0, this.cowTargetRotY || 0, 0);
+
+        // 從天而降霸氣著陸動畫
+        const startFall = performance.now();
+        const dropAnim = (now) => {
+          const p = Math.min((now - startFall) / 400, 1);
+          const easeOut = 1 - Math.pow(1 - p, 3);
+          this.cow.position.y = (blockY + 6.0) * (1 - easeOut) + blockY * easeOut;
+          if (p < 1) {
+            requestAnimationFrame(dropAnim);
+          } else {
+            sound.playLand();
+            this.playLandBounce();
+            this.createShockwave(savedBlockPos);
+            this.smoothMoveCameraTo(this.cow.position);
+            setTimeout(() => {
+              this.state = 'IDLE';
+            }, 300);
+          }
+        };
+        requestAnimationFrame(dropAnim);
+      }
+
+      finalizeGameOver() {
+        // 《最強領主》也失敗了，觸發最終 GameOver
+        this.state = 'GAMEOVER';
         if (this.score > this.highScore) {
           this.highScore = this.score;
           localStorage.setItem('niulai_jump_best', this.highScore.toString());
         }
-
-        setTimeout(() => {
-          this.modalScore.textContent = this.score;
-          this.modalBest.textContent = `歷史最佳: ${this.highScore}`;
-          this.gameOverModal.style.display = 'flex';
-        }, 650);
+        this.modalScore.textContent = this.score;
+        this.modalBest.textContent = `歷史最佳: ${this.highScore}`;
+        this.gameOverModal.style.display = 'flex';
       }
 
       restartGame() {
@@ -1460,8 +2360,14 @@
           this.camera.lookAt(this.cameraTarget);
         }
 
-        // 渲染
-        this.renderer.render(this.scene, this.camera);
+        // 如果在《最強領主》模式中，更新並渲染領主場景
+        if (this.state === 'IN_LORD') {
+          this.lordShooter.update(now);
+          this.renderer.render(this.lordShooter.scene, this.lordShooter.camera);
+        } else {
+          // 跳一跳主場景渲染
+          this.renderer.render(this.scene, this.camera);
+        }
       }
     }
 
