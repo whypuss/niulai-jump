@@ -1317,8 +1317,8 @@
         this.createSiegeCorridor();
 
         // 軍團狀態
-        this.armyCount = 6; // 開局 6 隻微型兵力！
-        this.maxEverArmy = 6;
+        this.armyCount = 8; // 開局 6 隻微型兵力！
+        this.maxEverArmy = 8;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
         this.soldiers = [];
@@ -1336,7 +1336,7 @@
         // 實體管理
         this.arrows = [];
         this.lastVolleyTime = 0;
-        this.baseVolleyInterval = 320; // 初始射速慢
+        this.baseVolleyInterval = 220; // 初始射速慢
 
         this.decisionSections = []; // 二選一叉路與分隔牆
         this.enemies = []; // 敵人群體 (普通小兵、盾兵、精英小隊長)
@@ -1349,7 +1349,7 @@
 
         // 滾動/推進距離
         this.worldZ = 0;
-        this.marchSpeed = 0.14; // 軍團緩慢向前推進
+        this.marchSpeed = 0.10; // 軍團緩慢向前推進
 
         // 操控輸入
         this.isPointerDown = false;
@@ -1433,8 +1433,8 @@
         this.reviveNotice.style.display = 'none';
 
         // 1. 開局微型兵力：6 隻！
-        this.armyCount = 6;
-        this.maxEverArmy = 6;
+        this.armyCount = 8;
+        this.maxEverArmy = 8;
         this.armyCenterX = 0;
         this.targetArmyX = 0;
         this.weaponBuff = { type: 'normal', duration: 0, ammo: 0, name: '普通短弓' };
@@ -1512,7 +1512,7 @@
 
       buildStageProgress() {
         // --- 波次 1: 熱身 3 隻普通小兵 (Z: -12) ---
-        this.spawnMobBatch(3, -12, 'normal', 45);
+        this.spawnMobBatch(3, -12, 'normal', 25);
 
         // --- 選擇 1 (Z: -28): 左路 [+4 士兵] vs 右路 [120 HP 玻璃球：連發弓] ---
         this.createDecisionPoint(-28, {
@@ -2019,13 +2019,17 @@
           }
         }
 
-        // 7. 敵兵壓境傷害
+        // 7. 敵兵壓境傷害 (必須嚴格進行 X 軸與 Z 軸實體碰撞箱檢測，且只有在軍團寬度範圍內才會撞到)
         const armyFrontZ = -this.worldZ;
+        const armyRadius = Math.max(1.2, Math.sqrt(this.armyCount) * 0.45);
         for (let i = this.enemies.length - 1; i >= 0; i--) {
           const e = this.enemies[i];
-          if (e.group.position.z > armyFrontZ - 0.5) {
-            // 撞擊軍團
-            const lost = e.isMiniBoss ? 6 : (e.type === 'shield' ? 3 : 2);
+          const distZ = Math.abs(e.group.position.z - armyFrontZ);
+          const distX = Math.abs(e.group.position.x - this.armyCenterX);
+
+          // 只有當敵怪正面衝撞進軍團方陣半徑內
+          if (distZ < 1.0 && distX < armyRadius + 0.5) {
+            const lost = e.isMiniBoss ? 3 : (e.type === 'shield' ? 2 : 1);
             this.armyCount = Math.max(0, this.armyCount - lost);
             this.scene.remove(e.group);
             this.enemies.splice(i, 1);
@@ -2037,6 +2041,10 @@
               this.loseGame();
               return;
             }
+          } else if (e.group.position.z > armyFrontZ + 8) {
+            // 敵兵如果已經被軍團甩在身後，平穩移除，不扣兵
+            this.scene.remove(e.group);
+            this.enemies.splice(i, 1);
           }
         }
 
