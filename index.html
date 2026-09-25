@@ -330,31 +330,33 @@
       text-shadow: 0 2px 8px rgba(0,0,0,0.8);
       letter-spacing: 0.5px;
     }
-    .lord-hp-bar-bg {
+        .lord-hp-bar-bg {
       width: 100%;
-      height: 16px;
-      background: rgba(0, 0, 0, 0.6);
+      height: 22px;
+      background: rgba(0, 0, 0, 0.75);
       border: 2px solid #ff4b2b;
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
       position: relative;
-      box-shadow: 0 0 12px rgba(255, 75, 43, 0.5);
+      box-shadow: 0 0 16px rgba(255, 75, 43, 0.7);
     }
     .lord-hp-bar-fill {
       height: 100%;
       width: 100%;
-      background: linear-gradient(90deg, #ff0844, #ffb199);
-      transition: width 0.1s linear;
+      background: linear-gradient(90deg, #e11d48, #fb7185, #f43f5e);
+      box-shadow: inset 0 2px 6px rgba(255,255,255,0.4);
+      transition: width 0.08s linear;
     }
     .lord-hp-text {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 11px;
-      font-weight: 800;
+      font-size: 13px;
+      font-weight: 900;
       color: #fff;
-      text-shadow: 0 1px 3px #000;
+      text-shadow: 0 1px 4px #000, 0 0 8px #ff0055;
+      letter-spacing: 0.5px;
     }
     .lord-tip {
       position: absolute;
@@ -1296,13 +1298,13 @@
         this.active = false;
 
         // 透視攻城視角
-        this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 350);
+        this.camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 800);
         this.camera.position.set(0, 19, 24);
         this.camera.lookAt(0, 2, -18);
 
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x131a26);
-        this.scene.fog = new THREE.FogExp2(0x131a26, 0.010);
+        this.scene.fog = new THREE.FogExp2(0x131a26, 0.0035);
 
         // 燈光系統
         const hemi = new THREE.HemisphereLight(0xddeeff, 0x112233, 0.9);
@@ -1313,7 +1315,7 @@
         this.scene.add(dir);
 
         this.trackWidth = 16;
-        this.trackLength = 260; // 延長通道以容納完整關卡歷程
+        this.trackLength = 2600; // 擴充 10 倍長度！ // 延長通道以容納完整關卡歷程
         this.createSiegeCorridor();
 
         // 軍團狀態
@@ -1511,49 +1513,120 @@
       }
 
       buildStageProgress() {
-        // --- 波次 1: 熱身 3 隻普通小兵 (Z: -12) ---
-        this.spawnMobBatch(3, -12, 'normal', 25);
+        // ==========================================
+        // 10 倍宏大攻城征程 (Z: 0 ~ -2400)
+        // ==========================================
+        let currentZ = -15;
 
-        // --- 選擇 1 (Z: -28): 左路 [+4 士兵] vs 右路 [120 HP 玻璃球：連發弓] ---
-        this.createDecisionPoint(-28, {
-          left: { type: 'add_soldier', val: 4, text: '+4 士兵' },
-          right: { type: 'weapon_orb', hp: 120, weapon: 'rapid', text: '連發弓 (120 HP)' }
+        // 【章節 1：邊境哨卡 (Z: -15 ~ -450)】
+        // 熱身部隊
+        this.spawnMobBatch(4, currentZ, 'normal', 30);
+        currentZ -= 35;
+
+        // 選擇 1: +5 士兵 vs 連發疾風弓 (200 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'add_soldier', val: 5, text: '+5 士兵' },
+          right: { type: 'weapon_orb', hp: 200, weapon: 'rapid', text: '連發弓 (200 HP)' }
         });
+        currentZ -= 45;
 
-        // --- 波次 2: 密集小兵 8 隻 (Z: -48) ---
-        this.spawnMobBatch(8, -48, 'normal', 55);
+        this.spawnMobBatch(8, currentZ, 'normal', 40);
+        currentZ -= 40;
+        this.spawnMobBatch(3, currentZ, 'shield', 160);
+        currentZ -= 45;
 
-        // --- 選擇 2 (Z: -66): 左路 [+6 士兵] vs 右路 [220 HP 玻璃球：穿透箭] ---
-        this.createDecisionPoint(-66, {
-          left: { type: 'add_soldier', val: 6, text: '+6 士兵' },
-          right: { type: 'weapon_orb', hp: 220, weapon: 'pierce', text: '穿透箭 (220 HP)' }
-        });
-
-        // --- 波次 3: 混合防線 10 隻小兵 + 2 隻盾兵 (Z: -86) ---
-        this.spawnMobBatch(10, -86, 'normal', 60);
-        this.spawnMobBatch(2, -88, 'shield', 180);
-
-        // --- 中段精英戰: 600 HP 赤紅小隊長 (Z: -108) ---
-        this.spawnMiniBoss(-108, 600);
-
-        // --- 選擇 3 (Z: -128): 左路 [復活 40% 陣亡士兵] vs 右路 [350 HP 玻璃球：火焰箭] ---
-        this.createDecisionPoint(-128, {
-          left: { type: 'revive_ratio', ratio: 0.4, text: '復活40%' },
-          right: { type: 'weapon_orb', hp: 350, weapon: 'fire', text: '火焰箭 (350 HP)' }
-        });
-
-        // --- 波次 4: 最後衝鋒 14 隻小兵 + 2 隻盾兵 (Z: -150) ---
-        this.spawnMobBatch(14, -150, 'normal', 70);
-        this.spawnMobBatch(2, -152, 'shield', 220);
-
-        // --- 最終決戰前補給門 (Z: -174) ---
-        this.createDecisionPoint(-174, {
+        // 選擇 2: +8 士兵 vs 貫穿強弩 (350 HP)
+        this.createDecisionPoint(currentZ, {
           left: { type: 'add_soldier', val: 8, text: '+8 士兵' },
-          right: { type: 'weapon_orb', hp: 450, weapon: 'fire', text: '巨弩神火 (450 HP)' }
+          right: { type: 'weapon_orb', hp: 350, weapon: 'pierce', text: '穿透箭 (350 HP)' }
         });
+        currentZ -= 55;
 
-        // --- 壓軸巨型 Boss 戰場 (Z: -205) ---
-        this.prepareFinalBoss(-205);
+        this.spawnMobBatch(12, currentZ, 'normal', 50);
+        currentZ -= 40;
+
+        // ⚔️ 小 BOSS 1 登場：【獵豹先鋒小霸王】(主動向玩家奔襲！2500 HP)
+        this.spawnActiveMiniBoss(currentZ, 'leopard', 2500, "⚡ 獵豹先鋒·小BOSS", 0.05);
+        currentZ -= 70;
+
+        // 選擇 3: 復活 40% 士兵 vs 焚天烈焰箭 (500 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'revive_ratio', ratio: 0.4, text: '復活40%' },
+          right: { type: 'weapon_orb', hp: 500, weapon: 'fire', text: '火焰箭 (500 HP)' }
+        });
+        currentZ -= 60;
+
+        // 【章節 2：重裝防線 (Z: -450 ~ -1050)】
+        this.spawnMobBatch(15, currentZ, 'normal', 65);
+        currentZ -= 45;
+        this.spawnMobBatch(6, currentZ, 'shield', 240);
+        currentZ -= 50;
+
+        // 選擇 4: +12 士兵 vs 狂風神弩 (650 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'add_soldier', val: 12, text: '+12 士兵' },
+          right: { type: 'weapon_orb', hp: 650, weapon: 'rapid', text: '極速連發 (650 HP)' }
+        });
+        currentZ -= 60;
+
+        this.spawnMobBatch(20, currentZ, 'normal', 75);
+        currentZ -= 45;
+        this.spawnMobBatch(8, currentZ, 'shield', 280);
+        currentZ -= 50;
+
+        // ⚔️ 小 BOSS 2 登場：【狂暴赤角戰牛·小BOSS】(沉重踏步衝擊！4800 HP)
+        this.spawnActiveMiniBoss(currentZ, 'bull', 4800, "🔥 赤角狂牛·小BOSS", 0.04);
+        currentZ -= 75;
+
+        // 選擇 5: +16 士兵 vs 爆裂穿透箭 (800 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'add_soldier', val: 16, text: '+16 士兵' },
+          right: { type: 'weapon_orb', hp: 800, weapon: 'pierce', text: '貫通神箭 (800 HP)' }
+        });
+        currentZ -= 65;
+
+        // 【章節 3：幽冥毒霧關隘 (Z: -1050 ~ -1750)】
+        this.spawnMobBatch(24, currentZ, 'normal', 85);
+        currentZ -= 50;
+        this.spawnMobBatch(10, currentZ, 'shield', 320);
+        currentZ -= 55;
+
+        // 選擇 6: 復活 50% 陣亡士兵 vs 滅世烈焰 (1000 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'revive_ratio', ratio: 0.5, text: '復活50%' },
+          right: { type: 'weapon_orb', hp: 1000, weapon: 'fire', text: '滅世烈焰 (1000 HP)' }
+        });
+        currentZ -= 70;
+
+        this.spawnMobBatch(30, currentZ, 'normal', 100);
+        currentZ -= 55;
+
+        // ⚔️ 小 BOSS 3 登場：【青蛇大護法·小BOSS】(蜿蜒大步逼近！7200 HP)
+        this.spawnActiveMiniBoss(currentZ, 'snake', 7200, "🐍 盤雲青蛇·小BOSS", 0.045);
+        currentZ -= 80;
+
+        // 選擇 7: +25 士兵 vs 傳奇神弓 (1300 HP)
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'add_soldier', val: 25, text: '+25 弓箭手' },
+          right: { type: 'weapon_orb', hp: 1300, weapon: 'fire', text: '天劫神弓 (1300 HP)' }
+        });
+        currentZ -= 75;
+
+        // 【章節 4：皇城決戰大道 (Z: -1750 ~ -2200)】
+        this.spawnMobBatch(36, currentZ, 'normal', 120);
+        currentZ -= 60;
+        this.spawnMobBatch(14, currentZ, 'shield', 400);
+        currentZ -= 65;
+
+        // 決戰前最後補給站
+        this.createDecisionPoint(currentZ, {
+          left: { type: 'add_soldier', val: 35, text: '全軍衝鋒 +35' },
+          right: { type: 'weapon_orb', hp: 1600, weapon: 'rapid', text: '暴風箭雨 (1600 HP)' }
+        });
+        currentZ -= 85;
+
+        // 👑 最終壓軸大 BOSS 登場 (血量 28000 HP！血條超長，主動邁開巨足朝玩家大步碾壓走過來！)
+        this.prepareFinalBoss(currentZ);
       }
 
       spawnMobBatch(count, zPos, mobType, hp) {
@@ -1590,6 +1663,29 @@
             isMiniBoss: false
           });
         }
+      }
+
+            spawnActiveMiniBoss(zPos, bossType, hp, name, moveSpeed) {
+        let model;
+        if (bossType === 'leopard') model = createLeopardBossModel();
+        else if (bossType === 'bull') model = createBigBullBossModel();
+        else model = createGreenSnakeBossModel();
+
+        model.position.set(0, 0, zPos);
+        model.scale.multiplyScalar(0.85); // 小 Boss 體型為大 Boss 的 85%
+        this.scene.add(model);
+
+        this.enemies.push({
+          group: model,
+          type: 'active_miniboss',
+          bossType: bossType,
+          name: name,
+          hp: hp,
+          maxHp: hp,
+          z: zPos,
+          moveSpeed: moveSpeed, // 主動走過來！
+          isMiniBoss: true
+        });
       }
 
       spawnMiniBoss(zPos, hp) {
@@ -1770,24 +1866,25 @@
       prepareFinalBoss(zPos) {
         const bosses = ['leopard', 'bull', 'snake'];
         this.bossType = bosses[Math.floor(Math.random() * bosses.length)];
-        let bossName = "狂暴獵豹 BOSS";
+        let bossName = "狂暴獵豹 大BOSS";
         if (this.bossType === 'leopard') {
           this.boss = createLeopardBossModel();
-          this.bossMaxHp = 2000;
-          bossName = "⚡ 狂暴獵豹 BOSS";
+          this.bossMaxHp = 25000; // 超長厚實血條！
+          bossName = "👑 萬獸主宰·狂暴獵豹 (大BOSS)";
         } else if (this.bossType === 'bull') {
           this.boss = createBigBullBossModel();
-          this.bossMaxHp = 2500;
-          bossName = "🔥 狂暴大戰牛 BOSS";
+          this.bossMaxHp = 32000; // 超長厚實血條！
+          bossName = "👑 崩山撼地·狂暴戰牛 (大BOSS)";
         } else {
           this.boss = createGreenSnakeBossModel();
-          this.bossMaxHp = 2200;
-          bossName = "🐍 幽冥青蛇王 BOSS";
+          this.bossMaxHp = 28000; // 超長厚實血條！
+          bossName = "👑 噬天化龍·幽冥青蛇 (大BOSS)";
         }
         this.bossHp = this.bossMaxHp;
         this.bossNameText.textContent = bossName;
         this.boss.position.set(0, 0, zPos);
         this.bossZ = zPos;
+        this.boss.scale.multiplyScalar(1.4); // 大 Boss 更加遮天蔽日
         this.scene.add(this.boss);
       }
 
@@ -1857,7 +1954,7 @@
           this.camera.position.z = -this.worldZ + 24;
 
           // 當推進到 Boss 決戰區 (Z: -195)
-          if (this.worldZ > 195) {
+          if (this.boss && Math.abs(-this.worldZ - this.boss.position.z) < 45) {
             this.bossStageActive = true;
             sound.playBossAlarm();
           }
@@ -2048,20 +2145,36 @@
           }
         }
 
-        // 8. 最終 Boss 戰鬥揮擊機制 (每隔 6 秒重擊揮擊一次！)
-        if (this.bossStageActive && this.boss) {
-          const sway = Math.sin(now * 0.0035) * 3.2;
-          this.boss.position.x = sway;
+        // 小 Boss 主動走向玩家踏步推進！
+        for (let e of this.enemies) {
+          if (e.type === 'active_miniboss') {
+            e.group.position.z += e.moveSpeed; // 主動迎面走來！
+            // 左右霸氣橫晃
+            e.group.position.x = Math.sin(now * 0.002 + e.z) * 2.2;
+          }
+        }
 
-          // 揮擊衝擊波
-          if (now - this.bossLastAttackTime > 6000) {
+        // 8. 最終大 BOSS 戰鬥：超長血條 + 主動大步踏碎大地走過來！
+        if (this.bossStageActive && this.boss) {
+          const sway = Math.sin(now * 0.003) * 3.5;
+          this.boss.position.x = sway;
+          // 大 Boss 邁開步伐主動逼近玩家！
+          const currentArmyZ = -this.worldZ;
+          if (this.boss.position.z < currentArmyZ - 12) {
+            this.boss.position.z += 0.06; // 主動大步走過來！
+            // 走動時身體起伏震顫
+            this.boss.position.y = Math.abs(Math.sin(now * 0.008)) * 0.5;
+          }
+
+          // 揮擊衝擊波 (每隔 4.5 秒發動一次大地踐踏)
+          if (now - this.bossLastAttackTime > 4500) {
             this.bossLastAttackTime = now;
-            // 揮擊衝擊消滅前排 2 隻士兵
-            this.armyCount = Math.max(0, this.armyCount - 2);
+            const lost = Math.max(1, Math.floor(this.armyCount * 0.08)); // 按比例扣除小部分兵力
+            this.armyCount = Math.max(0, this.armyCount - lost);
             this.rebuildArmyFormation();
             this.updateUI();
             sound.playFall();
-            this.showDamageText("BOSS 揮擊！-2", this.soldierGroup.position);
+            this.showDamageText(`BOSS 踐踏震盪！-${lost}`, this.soldierGroup.position);
 
             if (this.armyCount <= 0) {
               this.loseGame();
