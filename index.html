@@ -1547,7 +1547,7 @@
       const group = template.clone(true);
       group.name = "Mini_Leopard_" + mobType;
       group.scale.set(0.48, 0.48, 0.48); // 縮放為小怪尺寸
-      group.rotation.y = Math.PI; // 面向玩家衝殺
+      group.rotation.y = 0; // 面向玩家正前方衝殺 (頭在+Z)
 
       if (mobType === 'shield') {
         const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
@@ -1558,14 +1558,14 @@
       return group;
     }
 
-    function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
+        function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
       // 100% 採用原版跳一跳「牛來」完整精緻 3D 模具（含死魚眼、挑眉、肉吻、牛角、牛蹄）
       const template = getNiulaiTemplate();
       const cow = template.clone(true);
       cow.scale.set(0.42, 0.42, 0.42);
 
       if (isEnemy) {
-        cow.rotation.y = Math.PI; // 面向玩家軍團
+        cow.rotation.y = 0; // 敵怪面朝 +Z 正面衝向玩家
         cow.traverse(child => {
           if (child.isMesh && child.material) {
             if (child.name === 'Torso' || child.name === 'Belly' || (child.material.name === 'Yellow_Fur' || child.material.name === 'Fur_Belly')) {
@@ -1588,6 +1588,7 @@
           cow.add(giantHorn);
         }
       } else {
+        cow.rotation.y = Math.PI; // 友軍面朝 -Z 前方推進
         cow.traverse(child => {
           if (child.isMesh && (child.name === 'Torso' || child.material.name === 'Yellow_Fur')) {
             child.material = new THREE.MeshStandardMaterial({
@@ -1609,7 +1610,7 @@
       return cow;
     }
 
-        // ==========================================
+    // ==========================================
     // 2.7 《最強領主：軍團攻城齊射》
     class ArmyArcherSiege {
       constructor(game) {
