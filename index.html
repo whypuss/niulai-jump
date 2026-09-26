@@ -1402,63 +1402,132 @@
         // ==========================================
     // 2.6 全面還原 3D「牛來」士兵與敵怪工廠 (100% 原版模具)
     // ==========================================
-        function createMiniLeopardModel(mobType = 'normal') {
-      const group = createLeopardBossModel();
-      group.scale.set(0.42, 0.42, 0.42); // 縮放為小怪尺寸
-      group.rotation.y = Math.PI; // 面向玩家衝殺
+        // ==========================================
+    // 2.6 高性能 LOD 小怪與士兵 3D 模具 (大幅降低 Draw Call，絲滑 60FPS)
+    // ==========================================
+    const SHARED_MATS = {
+      furGold: new THREE.MeshLambertMaterial({ color: 0xee9b00 }),
+      snoutWhite: new THREE.MeshLambertMaterial({ color: 0xfdfaf7 }),
+      cowYellow: new THREE.MeshLambertMaterial({ color: 0xe0a62f }),
+      cowSnout: new THREE.MeshLambertMaterial({ color: 0xc2a1af }),
+      cowHorn: new THREE.MeshLambertMaterial({ color: 0x3a3536 }),
+      eyeWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      eyeBlack: new THREE.MeshBasicMaterial({ color: 0x000000 }),
+      redEnemy: new THREE.MeshLambertMaterial({ color: 0xdc2626 }),
+      darkRedEnemy: new THREE.MeshLambertMaterial({ color: 0x991b1b }),
+      blueSoldier: new THREE.MeshLambertMaterial({ color: 0x1d4ed8 }),
+      bowMat: new THREE.MeshLambertMaterial({ color: 0xd97706 }),
+      shieldMat: new THREE.MeshLambertMaterial({ color: 0x475569 })
+    };
+
+    function createMiniLeopardModel(mobType = 'normal') {
+      const g = new THREE.Group();
+      // 1. 軀幹
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.8), SHARED_MATS.furGold);
+      body.position.y = 0.5;
+      g.add(body);
+
+      // 2. 頭部
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.65, 0.75), SHARED_MATS.furGold);
+      head.position.set(0, 0.85, 0.85);
+      g.add(head);
+
+      // 3. 口吻
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.35), SHARED_MATS.snoutWhite);
+      snout.position.set(0, 0.7, 1.25);
+      g.add(snout);
+
+      // 4. 耳朵
+      const earL = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 4), SHARED_MATS.furGold);
+      earL.position.set(-0.3, 1.25, 0.8);
+      const earR = earL.clone();
+      earR.position.set(0.3, 1.25, 0.8);
+      g.add(earL); g.add(earR);
+
+      // 5. 眼睛
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.05), SHARED_MATS.eyeBlack);
+      eyeL.position.set(-0.2, 0.92, 1.24);
+      const eyeR = eyeL.clone();
+      eyeR.position.set(0.2, 0.92, 1.24);
+      g.add(eyeL); g.add(eyeR);
+
+      // 6. 尾巴
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 1.1, 6), SHARED_MATS.furGold);
+      tail.position.set(0, 0.8, -1.1);
+      tail.rotation.x = Math.PI / 3;
+      g.add(tail);
+
       if (mobType === 'shield') {
-        const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
-        const shield = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.0, 0.2), shieldMat);
-        shield.position.set(0, 1.8, 2.2);
-        group.add(shield);
+        const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.12), SHARED_MATS.shieldMat);
+        shield.position.set(0, 0.8, 1.4);
+        g.add(shield);
       }
-      return group;
+
+      g.scale.set(0.65, 0.65, 0.65);
+      g.rotation.y = Math.PI; // 面向玩家衝殺
+      return g;
     }
 
     function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
-      // 100% 採用原版跳一跳「牛來」完整精緻 3D 模具
-      const cow = createNiulaiCowModel();
-      cow.scale.set(0.38, 0.38, 0.38);
+      const g = new THREE.Group();
 
-      if (isEnemy) {
-        cow.rotation.y = Math.PI;
-        cow.traverse(child => {
-          if (child.isMesh && child.material) {
-            if (child.name === 'Torso' || (child.material.color && child.material.color.getHex() === 0xe0a62f)) {
-              child.material = new THREE.MeshStandardMaterial({
-                color: mobType === 'shield' ? 0x991b1b : (mobType === 'fast' ? 0xdc2626 : 0xb91c1c),
-                roughness: 0.7
-              });
-            }
-          }
-        });
+      const skinMat = isEnemy ? (mobType === 'shield' ? SHARED_MATS.darkRedEnemy : SHARED_MATS.redEnemy) : SHARED_MATS.cowYellow;
+      const uniformMat = isEnemy ? SHARED_MATS.darkRedEnemy : SHARED_MATS.blueSoldier;
 
-        if (mobType === 'shield') {
-          const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
-          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.15), shieldMat);
-          shield.position.set(0, 1.2, 0.65);
-          cow.add(shield);
-        } else if (mobType === 'fast') {
-          const giantHorn = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-          giantHorn.position.set(0, 3.1, 0);
-          cow.add(giantHorn);
-        }
-      } else {
-        cow.traverse(child => {
-          if (child.isMesh && child.name === 'Torso') {
-            child.material = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
-          }
-        });
+      // 1. 軀幹
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.7, 10), uniformMat);
+      body.position.y = 0.35;
+      g.add(body);
 
-        const bowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 });
-        const bow = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 6, 12, Math.PI), bowMat);
-        bow.position.set(0.9, 1.6, -0.2);
+      // 2. 圓萌牛頭
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), skinMat);
+      head.position.y = 0.95;
+      g.add(head);
+
+      // 3. 標誌肉吻
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.25), SHARED_MATS.cowSnout);
+      snout.position.set(0, 0.88, isEnemy ? 0.25 : -0.25);
+      g.add(snout);
+
+      // 4. 牛角
+      const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.28, 5), SHARED_MATS.cowHorn);
+      hornL.position.set(-0.24, 1.25, 0);
+      hornL.rotation.z = 0.35;
+      const hornR = hornL.clone();
+      hornR.position.set(0.24, 1.25, 0);
+      hornR.rotation.z = -0.35;
+      g.add(hornL); g.add(hornR);
+
+      // 5. 厭世死魚眼
+      const faceZ = isEnemy ? 0.3 : -0.3;
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.04), SHARED_MATS.eyeWhite);
+      eyeL.position.set(-0.14, 1.02, faceZ);
+      const pupilL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.05), SHARED_MATS.eyeBlack);
+      pupilL.position.set(-0.14, 1.02, faceZ + (isEnemy ? 0.02 : -0.02));
+      g.add(eyeL); g.add(pupilL);
+
+      const eyeR = eyeL.clone(); eyeR.position.x = 0.14;
+      const pupilR = pupilL.clone(); pupilR.position.x = 0.14;
+      g.add(eyeR); g.add(pupilR);
+
+      if (!isEnemy) {
+        // 戰弓
+        const bow = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.035, 5, 10, Math.PI), SHARED_MATS.bowMat);
+        bow.position.set(0.4, 0.55, -0.2);
         bow.rotation.y = Math.PI / 2;
         bow.rotation.z = Math.PI / 2;
-        cow.add(bow);
+        g.add(bow);
+      } else {
+        g.rotation.y = Math.PI;
+        if (mobType === 'shield') {
+          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.95, 0.12), SHARED_MATS.shieldMat);
+          shield.position.set(0, 0.55, 0.45);
+          g.add(shield);
+        }
       }
 
-      return cow;
+      g.scale.set(0.62, 0.62, 0.62);
+      return g;
     }
 
     // ==========================================
@@ -1674,9 +1743,9 @@
 
         // 【階段 1：新手熱身 (入門難度)】
         // 敵人速度慢 (0.08)、血量低 (18~20 HP)
-        this.spawnMobBatch(3, z, 'normal', 18, 0.08); z -= 10;
+        this.spawnMobBatch(3, z, 'normal', 18, 0.32); z -= 12;
         this.spawnPickups(z); z -= 8;
-        this.spawnMobBatch(4, z, 'normal', 22, 0.09); z -= 10;
+        this.spawnMobBatch(4, z, 'normal', 22, 0.34); z -= 12;
         this.spawnPickups(z); z -= 8;
 
         // 門 1: 兵力翻倍！爽快入門
@@ -1688,11 +1757,11 @@
 
         // 【階段 2：小試身手 (普通難度)】
         // 開始出現少量盾兵與疾跑兵，小怪血量 30~35 HP，移速 0.12
-        this.spawnMobBatch(6, z, 'normal', 28, 0.11); z -= 11;
+        this.spawnMobBatch(6, z, 'normal', 28, 0.38); z -= 14;
         this.spawnPickups(z); z -= 8;
         this.spawnMobBatch(2, z, 'shield', 80, 0.09); z -= 11;
         this.spawnPickups(z); z -= 8;
-        this.spawnMobBatch(5, z, 'fast', 25, 0.16); z -= 12;
+        this.spawnMobBatch(5, z, 'fast', 25, 0.48); z -= 14;
 
         // 門 2: 穩健增兵 vs 貫穿強弩
         this.createDecisionPoint(z, {
@@ -1702,7 +1771,7 @@
         z -= 20;
 
         // ⚔️ 小 BOSS 1：【狂暴獵豹·先鋒官】(平滑血量 1500 HP，移速 0.14)
-        this.spawnActiveMiniBoss(z, 'leopard', 1500, "⚡ 獵豹先鋒·小BOSS", 0.14);
+        this.spawnActiveMiniBoss(z, 'leopard', 1500, "⚡ 獵豹先鋒·小BOSS", 0.42);
         z -= 22;
 
         this.spawnPickups(z); z -= 8;
@@ -1710,9 +1779,9 @@
         // 【階段 3：中堅防線 (進階挑戰)】
         // 敵兵數量增加，血量提升至 45~50 HP，移速 0.14
         for (let i = 0; i < 3; i++) {
-          this.spawnMobBatch(8 + i * 2, z, 'normal', 40, 0.13); z -= 11;
+          this.spawnMobBatch(8 + i * 2, z, 'normal', 40, 0.40); z -= 14;
           this.spawnPickups(z); z -= 8;
-          this.spawnMobBatch(3 + i, z, 'shield', 120, 0.10); z -= 11;
+          this.spawnMobBatch(3 + i, z, 'shield', 120, 0.35); z -= 14;
           this.spawnPickups(z); z -= 8;
         }
 
@@ -1723,11 +1792,11 @@
         });
         z -= 20;
 
-        this.spawnMobBatch(10, z, 'fast', 35, 0.18); z -= 12;
+        this.spawnMobBatch(10, z, 'fast', 35, 0.52); z -= 14;
         this.spawnPickups(z); z -= 8;
 
         // ⚔️ 小 BOSS 2：【崩山狂牛·先鋒官】(血量 2800 HP，重步逼近 0.12)
-        this.spawnActiveMiniBoss(z, 'bull', 2800, "🔥 崩山狂牛·小BOSS", 0.12);
+        this.spawnActiveMiniBoss(z, 'bull', 2800, "🔥 崩山狂牛·小BOSS", 0.38);
         z -= 24;
 
         this.spawnPickups(z); z -= 8;
@@ -1741,14 +1810,14 @@
 
         // 【階段 4：王城精銳 (高潮階段)】
         for (let i = 0; i < 3; i++) {
-          this.spawnMobBatch(12 + i * 2, z, 'normal', 50, 0.15); z -= 11;
+          this.spawnMobBatch(12 + i * 2, z, 'normal', 50, 0.42); z -= 14;
           this.spawnPickups(z); z -= 8;
-          this.spawnMobBatch(5 + i, z, 'fast', 40, 0.20); z -= 11;
+          this.spawnMobBatch(5 + i, z, 'fast', 40, 0.55); z -= 14;
           this.spawnPickups(z); z -= 8;
         }
 
         // ⚔️ 小 BOSS 3：【幽冥青蛇·大護法】(血量 4200 HP，蛇形游動 0.14)
-        this.spawnActiveMiniBoss(z, 'snake', 4200, "🐍 幽冥青蛇·小BOSS", 0.14);
+        this.spawnActiveMiniBoss(z, 'snake', 4200, "🐍 幽冥青蛇·小BOSS", 0.40);
         z -= 25;
 
         this.spawnPickups(z); z -= 8;
@@ -1764,7 +1833,7 @@
         this.prepareFinalBoss(z);
       }
 
-      spawnMobBatch(count, zPos, mobType, hp, moveSpeed = 0.12) {
+      spawnMobBatch(count, zPos, mobType, hp, moveSpeed = 0.36) {
         // 數量增加 3 倍！
         const tripleCount = Math.floor(count * 3);
         for (let i = 0; i < tripleCount; i++) {
@@ -2311,12 +2380,15 @@
 
         // 所有敵怪（普通兵、盾兵、疾跑兵、小Boss）都大步迎面主動衝鋒！
         const nowMs = performance.now();
+        const curArmyZ = -this.worldZ;
         for (let e of this.enemies) {
+          const distToArmy = Math.abs(e.group.position.z - curArmyZ);
+          if (distToArmy > 120) continue;
+
           const isFrozen = e.frozenUntil && e.frozenUntil > nowMs;
           if (!isFrozen && e.moveSpeed) {
             e.group.position.z += e.moveSpeed; // 大步朝玩家衝擊！
-            // 踏步身體起伏動畫
-            e.group.position.y = (e.type === 'shield' || e.type === 'normal' ? 0.55 : 0.6) + Math.abs(Math.sin(now * 0.015 + e.group.position.z)) * 0.15;
+            e.group.position.y = 0.5 + Math.abs(Math.sin(now * 0.015 + e.group.position.z)) * 0.12;
           }
           if (e.type === 'active_miniboss') {
             if (!isFrozen) e.group.position.x = Math.sin(now * 0.003 + e.z) * 2.6;
@@ -2380,7 +2452,7 @@
           // 大 Boss 邁開步伐主動逼近玩家！
           const currentArmyZ = -this.worldZ;
           if (this.boss.position.z < currentArmyZ - 12) {
-            this.boss.position.z += 0.06; // 主動大步走過來！
+            this.boss.position.z += 0.25; // 狂暴大步碾壓衝鋒！ // 主動大步走過來！
             // 走動時身體起伏震顫
             this.boss.position.y = Math.abs(Math.sin(now * 0.008)) * 0.5;
           }

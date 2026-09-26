@@ -27,6 +27,7 @@ mkdir -p "$WORK_DIR/assets/public/vendor"
 
 cp "$DIR/index.html" "$WORK_DIR/assets/public/index.html"
 cp "$DIR/niulai_cow.glb" "$WORK_DIR/assets/public/niulai_cow.glb"
+[ -f "$DIR/leopard_boss.glb" ] && cp "$DIR/leopard_boss.glb" "$WORK_DIR/assets/public/leopard_boss.glb" || true
 cp "$DIR/vendor/three.min.js" "$WORK_DIR/assets/public/vendor/three.min.js"
 cp "$DIR/vendor/GLTFExporter.js" "$WORK_DIR/assets/public/vendor/GLTFExporter.js"
 
