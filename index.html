@@ -435,9 +435,37 @@
       100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     }
 
+
+    /* Debug Performance HUD */
+    #perf-hud {
+      position: fixed;
+      top: 4px;
+      right: 4px;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.75);
+      color: #00ff88;
+      padding: 8px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.35;
+      border: 1px solid #00ff88;
+      border-radius: 4px;
+      pointer-events: none;
+      min-width: 180px;
+      box-shadow: 0 2px 12px rgba(0, 255, 136, 0.3);
+    }
+    #perf-hud .hud-row { display: flex; justify-content: space-between; gap: 8px; }
+    #perf-hud .hud-label { color: #88d9aa; }
+    #perf-hud .hud-value { color: #ffffff; font-weight: 900; }
+    #perf-hud .warn { color: #ff9500; }
+    #perf-hud .crit { color: #ff3355; }
+    #perf-hud .ok { color: #00ff88; }
+
   </style>
   <!-- 優先載入本地離線資源，極速秒開無延遲 -->
   <script src="vendor/three.min.js"></script>
+  <script src="vendor/GLTFLoader.js"></script>
   <script src="vendor/GLTFExporter.js"></script>
   <!-- CDN 備用 Fallback -->
   <script>
@@ -450,6 +478,22 @@
 <body>
 
   <div id="canvas-container"></div>
+
+  <div id="perf-hud">
+    <div class="hud-row"><span class="hud-label">FPS</span><span class="hud-value" id="hud-fps">--</span></div>
+    <div class="hud-row"><span class="hud-label">Frame</span><span class="hud-value" id="hud-frame">-- ms</span></div>
+    <div class="hud-row"><span class="hud-label">CPU JS</span><span class="hud-value" id="hud-cpu">-- ms</span></div>
+    <div class="hud-row"><span class="hud-label">DrawCalls</span><span class="hud-value" id="hud-dc">--</span></div>
+    <div class="hud-row"><span class="hud-label">Triangles</span><span class="hud-value" id="hud-tri">--</span></div>
+    <div class="hud-row"><span class="hud-label">Geometries</span><span class="hud-value" id="hud-geo">--</span></div>
+    <div class="hud-row"><span class="hud-label">Textures</span><span class="hud-value" id="hud-tex">--</span></div>
+    <div class="hud-row"><span class="hud-label">Monsters</span><span class="hud-value" id="hud-mon">0</span></div>
+    <div class="hud-row"><span class="hud-label">AnimTick</span><span class="hud-value" id="hud-anim">0</span></div>
+    <div class="hud-row"><span class="hud-label">AITick</span><span class="hud-value" id="hud-ai">0</span></div>
+    <div class="hud-row"><span class="hud-label">CollChk</span><span class="hud-value" id="hud-col">0</span></div>
+    <div class="hud-row"><span class="hud-label">PixelRatio</span><span class="hud-value" id="hud-pr">--</span></div>
+    <div class="hud-row"><span class="hud-label">ShadowMap</span><span class="hud-value" id="hud-shadow">on</span></div>
+  </div>
 
   <div id="ui-overlay">
     <div class="header-bar">
@@ -1021,356 +1065,433 @@
     // ==========================================
     // 包含：圖一經典粉紅禮物盒、白色表情萌物盒、灰色小白點盒、綠色小圓柱等
     
-    function createLeopardBossModel() {
-      // 依據用戶最新圖片深度建模：矯健金黃獵豹、立體頭部與口鼻、黑斑花紋、長尾
-      const group = new THREE.Group();
-      group.name = "Boss_Leopard";
+        function createLeopardBossModel() {
+  const root = new THREE.Group();
+  root.name = 'Leopard_Boss';
 
-      const goldMat = new THREE.MeshStandardMaterial({
-        color: 0xee9b00, // 獵豹金黃底色
-        roughness: 0.65,
-        metalness: 0.1
-      });
-      const spotMat = new THREE.MeshStandardMaterial({
-        color: 0x1f1610, // 深黑棕豹斑
-        roughness: 0.8
-      });
-      const chestMat = new THREE.MeshStandardMaterial({
-        color: 0xfbf0da, // 淺米白/淺肉色胸腹
-        roughness: 0.7
-      });
-      const snoutMat = new THREE.MeshStandardMaterial({
-        color: 0xfdfaf7, // 白色口吻部
-        roughness: 0.5
-      });
-      const noseMat = new THREE.MeshStandardMaterial({
-        color: 0x2b1d1d, // 黑色小鼻頭
-        roughness: 0.8
-      });
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x10b981 }); // 翠綠豹眼
-      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  // ============== MATERIALS ==============
+  // 金黃獵豹主體毛色
+  const matFur = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Fur_Gold',
+    color: 0xee9b00,
+    roughness: 0.68,
+    metalness: 0.08
+  });
+  // 白色口吻
+  const matSnout = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Snout_White',
+    color: 0xfdfaf7,
+    roughness: 0.45
+  });
+  // 米白胸腹
+  const matBelly = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Chest_Cream',
+    color: 0xfbf0da,
+    roughness: 0.6
+  });
+  // 深色鼻頭/爪墊
+  const matDarkDetail = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Dark_Detail',
+    color: 0x2b1d1d,
+    roughness: 0.8
+  });
+  // 黑色豹紋斑 (Rosettes)
+  const matRosette = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Rosette_Spot',
+    color: 0x1f1610,
+    roughness: 0.85
+  });
+  // 翡翠綠豹眼
+  const matEyeGreen = new THREE.MeshBasicMaterial({
+    name: 'Leopard_Eye_Green',
+    color: 0x10b981
+  });
+  // 瞳孔
+  const matPupil = new THREE.MeshBasicMaterial({
+    name: 'Leopard_Pupil_Black',
+    color: 0x000000
+  });
+  // 白牙
+  const matFang = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Fang_White',
+    color: 0xffffff,
+    roughness: 0.2
+  });
+  // 耳內粉
+  const matInnerEar = new THREE.MeshStandardMaterial({
+    name: 'Leopard_Inner_Ear',
+    color: 0xe5c5be,
+    roughness: 0.7
+  });
 
-      // 1. 矯健流線身軀
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.45, 4.2, 16), goldMat);
-      body.rotation.x = Math.PI / 2;
-      body.position.set(0, 1.8, 0);
-      body.castShadow = true;
-      group.add(body);
+  // ============== BODY (BODY & CHEST) ==============
+  const bodyGroup = new THREE.Group();
+  bodyGroup.name = 'Body';
 
-      // 胸腹淺色毛層
-      const belly = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.25, 3.8, 12, 1, false, -Math.PI / 3, (2 * Math.PI) / 3), chestMat);
-      belly.rotation.x = Math.PI / 2;
-      belly.position.set(0, 1.4, 0);
-      group.add(belly);
+  // 主軀幹 - 長圓柱，前細後粗
+  const torsoGeo = new THREE.CylinderGeometry(1.15, 1.45, 4.4, 20);
+  const torso = new THREE.Mesh(torsoGeo, matFur);
+  torso.name = 'Torso';
+  torso.rotation.x = Math.PI / 2;
+  torso.position.set(0, 1.8, 0);
+  torso.castShadow = true;
+  bodyGroup.add(torso);
 
-      // 軀幹大量分佈立體黑色豹紋斑點 (Rosettes)
-      const spotPositions = [
-        [1.22, 2.2, 0.8], [-1.22, 2.2, 0.8],
-        [1.25, 2.0, -0.6], [-1.25, 2.0, -0.6],
-        [1.18, 1.6, 1.2], [-1.18, 1.6, 1.2],
-        [0.7, 2.8, 0.2], [-0.7, 2.8, 0.2],
-        [0.8, 2.6, -1.2], [-0.8, 2.6, -1.2],
-        [1.2, 1.9, -1.4], [-1.2, 1.9, -1.4],
-        [0, 2.85, 0.8], [0, 2.75, -0.4]
-      ];
-      spotPositions.forEach(p => {
-        const spot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.05, 8), spotMat);
-        spot.position.set(...p);
-        spot.rotation.z = Math.PI / 2;
-        group.add(spot);
-      });
+  // 胸腹淺色區 - 前半球覆蓋
+  const bellyGeo = new THREE.SphereGeometry(1.15, 20, 16);
+  const belly = new THREE.Mesh(bellyGeo, matBelly);
+  belly.name = 'Belly';
+  belly.scale.set(0.9, 0.5, 1.3);
+  belly.position.set(0, 1.2, 0.3);
+  bodyGroup.add(belly);
 
-      // 2. 霸氣豹首
-      const headGroup = new THREE.Group();
-      headGroup.position.set(0, 2.7, 2.4);
+  // 肩膀隆起
+  const shoulderGeo = new THREE.SphereGeometry(0.95, 18, 14);
+  const shoulderL = new THREE.Mesh(shoulderGeo, matFur);
+  shoulderL.name = 'Shoulder_L';
+  shoulderL.position.set(-0.95, 2.05, 1.35);
+  bodyGroup.add(shoulderL);
+  const shoulderR = shoulderL.clone();
+  shoulderR.name = 'Shoulder_R';
+  shoulderR.position.set(0.95, 2.05, 1.35);
+  bodyGroup.add(shoulderR);
 
-      const skull = new THREE.Mesh(new THREE.SphereGeometry(1.2, 18, 16), goldMat);
-      skull.scale.set(1.0, 0.9, 1.15);
-      skull.castShadow = true;
-      headGroup.add(skull);
+  // 髖部隆起
+  const hipGeo = new THREE.SphereGeometry(1.0, 18, 14);
+  const hipL = new THREE.Mesh(hipGeo, matFur);
+  hipL.name = 'Hip_L';
+  hipL.position.set(-0.9, 1.85, -1.35);
+  bodyGroup.add(hipL);
+  const hipR = hipL.clone();
+  hipR.name = 'Hip_R';
+  hipR.position.set(0.9, 1.85, -1.35);
+  bodyGroup.add(hipR);
 
-      // 白色大口吻 (Snout)
-      const snout = new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 12), snoutMat);
-      snout.scale.set(1.1, 0.65, 1.2);
-      snout.position.set(0, -0.32, 0.95);
-      headGroup.add(snout);
+  // ============== ROSETTES (豹紋斑點) ==============
+  // 分佈在兩側肩髖、背部、腿根，立體貼附
+  const rosettePositions = [
+    // 左側身體
+    [-1.42, 2.4, 0.8, 0], [-1.42, 1.9, 0.2, 0], [-1.42, 2.2, -0.4, 0],
+    [-1.4, 1.6, 1.5, 0], [-1.4, 1.7, -1.0, 0], [-1.35, 1.4, -0.1, 0],
+    // 右側身體
+    [1.42, 2.4, 0.8, 0], [1.42, 1.9, 0.2, 0], [1.42, 2.2, -0.4, 0],
+    [1.4, 1.6, 1.5, 0], [1.4, 1.7, -1.0, 0], [1.35, 1.4, -0.1, 0],
+    // 背部斑點
+    [0, 2.85, 1.1, 0], [0.25, 2.82, 0.5, 0], [-0.25, 2.82, -0.1, 0],
+    [0, 2.78, -0.9, 0], [0.2, 2.75, -1.5, 0]
+  ];
+  rosettePositions.forEach((p, i) => {
+    const rosetteGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.06, 10);
+    const rosette = new THREE.Mesh(rosetteGeo, matRosette);
+    rosette.name = `Rosette_${i}`;
+    rosette.position.set(...p);
+    rosette.rotation.z = Math.PI / 2;
+    bodyGroup.add(rosette);
 
-      // 黑色小鼻頭
-      const nose = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.15), noseMat);
-      nose.position.set(0, -0.15, 1.6);
-      headGroup.add(nose);
+    // 中心淺色斑核（真實豹紋）
+    const centerGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.07, 8);
+    const center = new THREE.Mesh(centerGeo, matFur);
+    center.position.set(...p);
+    center.rotation.z = Math.PI / 2;
+    bodyGroup.add(center);
+  });
 
-      // 獠牙
-      [-0.35, 0.35].forEach(x => {
-        const fang = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
-        fang.rotation.x = Math.PI * 0.9;
-        fang.position.set(x, -0.5, 1.35);
-        headGroup.add(fang);
-      });
+  // ============== HEAD ==============
+  const headGroup = new THREE.Group();
+  headGroup.name = 'Head';
+  headGroup.position.set(0, 2.75, 2.4);
 
-      // 圓弧立耳 (黑色耳背 + 內耳粉白)
-      [-0.78, 0.78].forEach(x => {
-        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.65, 8), goldMat);
-        ear.position.set(x, 1.1, -0.2);
-        ear.rotation.z = x > 0 ? -0.4 : 0.4;
-        ear.rotation.x = -0.25;
-        headGroup.add(ear);
-      });
+  // 頭蓋 (Skull) - 圓潤球體，微前凸
+  const skullGeo = new THREE.SphereGeometry(1.25, 24, 20);
+  const skull = new THREE.Mesh(skullGeo, matFur);
+  skull.name = 'Skull';
+  skull.scale.set(1.0, 0.95, 1.15);
+  skull.castShadow = true;
+  headGroup.add(skull);
 
-      // 翡翠綠豹目 (帶黑色眼線)
-      [-0.48, 0.48].forEach(x => {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), eyeMat);
-        eye.position.set(x, 0.22, 0.92);
-        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), pupilMat);
-        pupil.position.set(x * 1.02, 0.22, 1.05);
-        headGroup.add(eye);
-        headGroup.add(pupil);
-      });
+  // 額頭隆起 (Forehead bulge)
+  const foreheadGeo = new THREE.SphereGeometry(0.55, 14, 12);
+  const forehead = new THREE.Mesh(foreheadGeo, matFur);
+  forehead.name = 'Forehead';
+  forehead.position.set(0, 0.35, 0.85);
+  forehead.scale.set(0.85, 0.5, 0.6);
+  headGroup.add(forehead);
 
-      group.add(headGroup);
+  // ============== SNOUT (口吻) ==============
+  const snoutGroup = new THREE.Group();
+  snoutGroup.name = 'Snout';
+  snoutGroup.position.set(0, -0.25, 0.85);
 
-      // 3. 強健四肢
-      const legGeo = new THREE.CylinderGeometry(0.42, 0.36, 1.8, 12);
-      const pawGeo = new THREE.BoxGeometry(0.55, 0.28, 0.72);
-      const legPositions = [
-        [-0.95, 0.9, 1.4],
-        [0.95, 0.9, 1.4],
-        [-0.95, 0.9, -1.4],
-        [0.95, 0.9, -1.4]
-      ];
-      legPositions.forEach(p => {
-        const legGroup = new THREE.Group();
-        legGroup.position.set(...p);
-        const leg = new THREE.Mesh(legGeo, goldMat);
-        leg.castShadow = true;
-        const paw = new THREE.Mesh(pawGeo, chestMat);
-        paw.position.set(0, -0.85, 0.12);
-        legGroup.add(leg);
-        legGroup.add(paw);
-        group.add(legGroup);
-      });
+  // 主口吻 - 大圓球
+  const snoutGeo = new THREE.SphereGeometry(0.85, 20, 16);
+  const snout = new THREE.Mesh(snoutGeo, matSnout);
+  snout.name = 'Snout_Main';
+  snout.scale.set(1.15, 0.7, 1.2);
+  snout.castShadow = true;
+  snoutGroup.add(snout);
 
-      // 4. 獵豹長尾巴 (向上微卷)
-      const tailGroup = new THREE.Group();
-      tailGroup.position.set(0, 2.2, -2.1);
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.09, 2.6, 8), goldMat);
-      tail.position.set(0, 0.6, -1.1);
-      tail.rotation.x = Math.PI / 3;
-      tailGroup.add(tail);
-      group.add(tailGroup);
+  // 上唇 - 厚實圓柱環
+  const upperLipGeo = new THREE.CylinderGeometry(0.72, 0.78, 0.28, 16);
+  const upperLip = new THREE.Mesh(upperLipGeo, matSnout);
+  upperLip.name = 'Upper_Lip';
+  upperLip.rotation.x = Math.PI / 10;
+  upperLip.position.set(0, 0.12, 0.28);
+  snoutGroup.add(upperLip);
 
-      group.scale.set(1.4, 1.4, 1.4);
-      return group;
-    }
+  // 下唇
+  const lowerLipGeo = new THREE.CylinderGeometry(0.6, 0.55, 0.18, 14);
+  const lowerLip = new THREE.Mesh(lowerLipGeo, matSnout);
+  lowerLip.name = 'Lower_Lip';
+  lowerLip.position.set(0, -0.22, 0.2);
+  snoutGroup.add(lowerLip);
 
-    function createBigBullBossModel() {
-      // 大牛 Boss (凶狠紅色戰牛、金色巨角、鼻環)
-      const group = new THREE.Group();
-      group.name = "Boss_BigBull";
+  // 嘴線（水平暗線，分割上下唇）
+  const mouthLineGeo = new THREE.BoxGeometry(0.9, 0.03, 0.05);
+  const mouthLine = new THREE.Mesh(mouthLineGeo, matDarkDetail);
+  mouthLine.name = 'Mouth_Line';
+  mouthLine.position.set(0, -0.05, 1.0);
+  snoutGroup.add(mouthLine);
 
-      const bullMat = new THREE.MeshStandardMaterial({ color: 0x9b111e, roughness: 0.6 });
-      const darkMat = new THREE.MeshStandardMaterial({ color: 0x4a0e17, roughness: 0.7 });
-      const goldHornMat = new THREE.MeshStandardMaterial({ color: 0xf5b722, metalness: 0.6, roughness: 0.3 });
-      const ringMat = new THREE.MeshStandardMaterial({ color: 0xffdd53, metalness: 0.8, roughness: 0.2 });
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff1100 });
+  // 鼻頭 - 黑色三角
+  const noseGeo = new THREE.ConeGeometry(0.24, 0.32, 3);
+  const nose = new THREE.Mesh(noseGeo, matDarkDetail);
+  nose.name = 'Nose';
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.set(0, 0.28, 1.05);
+  snoutGroup.add(nose);
 
-      // 壯碩龐大軀幹
-      const body = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.4, 4.0), bullMat);
-      body.position.y = 2.0;
-      body.castShadow = true;
-      group.add(body);
+  // 鼻孔（鼻頭兩側小暗洞）
+  [-0.1, 0.1].forEach(x => {
+    const nostrilGeo = new THREE.SphereGeometry(0.055, 8, 6);
+    const nostril = new THREE.Mesh(nostrilGeo, matDarkDetail);
+    nostril.position.set(x, 0.2, 1.18);
+    snoutGroup.add(nostril);
+  });
 
-      // 背部隆肉 (Hump)
-      const hump = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 1.8), darkMat);
-      hump.position.set(0, 3.4, 0.8);
-      group.add(hump);
+  // 獠牙 (4 顆尖牙，前下頜外露)
+  [-0.42, -0.2, 0.2, 0.42].forEach(x => {
+    const fangGeo = new THREE.ConeGeometry(0.085, 0.42, 6);
+    const fang = new THREE.Mesh(fangGeo, matFang);
+    fang.name = 'Fang';
+    fang.rotation.x = Math.PI * 0.92;
+    fang.position.set(x, -0.4, 0.85);
+    snoutGroup.add(fang);
+  });
 
-      // 牛頭
-      const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 2.4), bullMat);
-      head.position.set(0, 2.7, 2.6);
-      head.castShadow = true;
-      group.add(head);
+  headGroup.add(snoutGroup);
 
-      // 巨大金色牛角 (左右橫展向上)
-      const hornGeo = new THREE.CylinderGeometry(0.15, 0.45, 2.2, 16);
-      const hornLeft = new THREE.Mesh(hornGeo, goldHornMat);
-      hornLeft.position.set(-1.8, 3.8, 2.2);
-      hornLeft.rotation.z = Math.PI / 3;
-      hornLeft.rotation.y = -Math.PI / 6;
+  // ============== EYES (雙翡翠綠豹眼) ==============
+  [-1, 1].forEach(side => {
+    const eyeGroup = new THREE.Group();
+    eyeGroup.name = side === -1 ? 'Eye_L' : 'Eye_R';
+    eyeGroup.position.set(side * 0.5, 0.28, 0.85);
 
-      const hornRight = new THREE.Mesh(hornGeo, goldHornMat);
-      hornRight.position.set(1.8, 3.8, 2.2);
-      hornRight.rotation.z = -Math.PI / 3;
-      hornRight.rotation.y = Math.PI / 6;
+    // 眼窩凹陷（黃色皮膚）
+    const socketGeo = new THREE.SphereGeometry(0.28, 12, 10);
+    const socket = new THREE.Mesh(socketGeo, matFur);
+    socket.scale.set(1.2, 1.0, 0.55);
+    socket.position.set(0, 0, -0.02);
+    eyeGroup.add(socket);
 
-      group.add(hornLeft);
-      group.add(hornRight);
+    // 眼白球
+    const eyeballGeo = new THREE.SphereGeometry(0.24, 14, 12);
+    const eyeball = new THREE.Mesh(eyeballGeo, matEyeGreen);
+    eyeball.name = 'Eyeball';
+    eyeball.scale.set(1.1, 0.85, 0.55);
+    eyeball.position.set(0, 0, 0.06);
+    eyeGroup.add(eyeball);
 
-      // 厚嘴吻部
-      const snout = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 1.2), darkMat);
-      snout.position.set(0, 2.1, 3.8);
-      group.add(snout);
+    // 豎瞳
+    const pupilGeo = new THREE.SphereGeometry(0.11, 10, 8);
+    const pupil = new THREE.Mesh(pupilGeo, matPupil);
+    pupil.name = 'Pupil';
+    pupil.scale.set(0.5, 1.5, 0.6);
+    pupil.position.set(0, 0.02, 0.18);
+    eyeGroup.add(pupil);
 
-      // 金色大鼻環
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.08, 12, 24), ringMat);
-      ring.position.set(0, 1.6, 4.2);
-      ring.rotation.x = Math.PI / 4;
-      group.add(ring);
+    // 上下瞼皮（黃色皮膚半遮）
+    const lidGeo = new THREE.SphereGeometry(0.28, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.4);
+    const upperLid = new THREE.Mesh(lidGeo, matFur);
+    upperLid.scale.set(1.2, 1.0, 0.55);
+    upperLid.rotation.x = Math.PI / 2 + 0.2;
+    upperLid.position.set(0, 0.02, 0.05);
+    eyeGroup.add(upperLid);
 
-      // 赤紅雙目
-      const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.1), eyeMat);
-      eye1.position.set(-0.75, 2.9, 3.82);
-      const eye2 = eye1.clone();
-      eye2.position.set(0.75, 2.9, 3.82);
-      group.add(eye1);
-      group.add(eye2);
+    headGroup.add(eyeGroup);
+  });
 
-      // 粗壯牛腿
-      const legGeo = new THREE.BoxGeometry(0.9, 1.4, 0.9);
-      const legPositions = [
-        [-1.1, 0.7, 1.4],
-        [1.1, 0.7, 1.4],
-        [-1.1, 0.7, -1.4],
-        [1.1, 0.7, -1.4]
-      ];
-      legPositions.forEach(p => {
-        const leg = new THREE.Mesh(legGeo, darkMat);
-        leg.position.set(...p);
-        leg.castShadow = true;
-        group.add(leg);
-      });
+  // 額頭眉紋 (T marks - 豹額頭經典三條黑線)
+  [-0.28, 0, 0.28].forEach(x => {
+    const browMarkGeo = new THREE.BoxGeometry(0.06, 0.32, 0.05);
+    const browMark = new THREE.Mesh(browMarkGeo, matRosette);
+    browMark.name = 'Brow_Mark';
+    browMark.position.set(x, 0.65, 1.0);
+    browMark.rotation.x = -0.2;
+    headGroup.add(browMark);
+  });
 
-      group.scale.set(1.3, 1.3, 1.3);
-      return group;
-    }
+  // 臉頰斑點
+  [-0.85, 0.85].forEach(x => {
+    const cheekSpotGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 8);
+    const cheekSpot = new THREE.Mesh(cheekSpotGeo, matRosette);
+    cheekSpot.position.set(x, -0.05, 0.55);
+    cheekSpot.rotation.z = Math.PI / 2;
+    headGroup.add(cheekSpot);
+  });
 
-    function createGreenSnakeBossModel() {
-      // 升級版高精緻度 3D 幽冥青蛇 Boss：立體流線蛇頸、翡翠鱗片層次、三角毒蛇首、白色毒牙、分叉血信
-      const group = new THREE.Group();
-      group.name = "Boss_GreenSnake";
+  // ============== EARS ==============
+  [-1, 1].forEach(side => {
+    const earGroup = new THREE.Group();
+    earGroup.name = side === -1 ? 'Ear_L' : 'Ear_R';
+    earGroup.position.set(side * 0.8, 1.0, -0.1);
 
-      const emeraldMat = new THREE.MeshStandardMaterial({
-        color: 0x059669, // 翡翠深青綠
-        roughness: 0.35,
-        metalness: 0.25
-      });
-      const bellyMat = new THREE.MeshStandardMaterial({
-        color: 0xa7f3d0, // 腹部淡青白鱗甲
-        roughness: 0.55
-      });
-      const scalePatternMat = new THREE.MeshStandardMaterial({
-        color: 0x047857,
-        roughness: 0.4,
-        metalness: 0.3
-      });
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 }); // 耀眼金蛇瞳
-      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-      const fangMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
-      const tongueMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
-      const crestMat = new THREE.MeshStandardMaterial({
-        color: 0x10b981,
-        emissive: 0x047857,
-        emissiveIntensity: 0.4,
-        metalness: 0.4,
-        roughness: 0.2
-      });
+    // 外耳 (圓弧三角)
+    const earOuterGeo = new THREE.ConeGeometry(0.4, 0.7, 6);
+    const earOuter = new THREE.Mesh(earOuterGeo, matFur);
+    earOuter.name = 'Ear_Outer';
+    earOuter.scale.set(1.0, 1.0, 0.35);
+    earOuter.rotation.z = side * -0.42;
+    earOuter.rotation.x = -0.2;
+    earGroup.add(earOuter);
 
-      // 1. 盤旋昂立的 14 節平滑蛇身（自然 S 型昂起）
-      const segCount = 14;
-      for (let i = 0; i < segCount; i++) {
-        const t = i / segCount;
-        const rad = 1.35 * (1 - t * 0.45);
-        const seg = new THREE.Group();
+    // 內耳 (粉紅色)
+    const innerGeo = new THREE.ConeGeometry(0.28, 0.5, 6);
+    const innerEar = new THREE.Mesh(innerGeo, matInnerEar);
+    innerEar.name = 'Ear_Inner';
+    innerEar.scale.set(0.9, 0.9, 0.15);
+    innerEar.position.set(0, 0.05, 0.1);
+    innerEar.rotation.z = side * -0.42;
+    earGroup.add(innerEar);
 
-        // 圓潤蛇身切片
-        const sMesh = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.9, rad, 0.75, 20), emeraldMat);
-        sMesh.castShadow = true;
-        seg.add(sMesh);
+    // 耳尖黑斑
+    const tipGeo = new THREE.SphereGeometry(0.15, 10, 8);
+    const earTip = new THREE.Mesh(tipGeo, matRosette);
+    earTip.name = 'Ear_Tip';
+    earTip.position.set(0, 0.3, 0);
+    earGroup.add(earTip);
 
-        // 腹部淡青軟甲條
-        const bellyPlate = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.92, rad * 1.02, 0.72, 10, 1, false, -Math.PI / 3, (2 * Math.PI) / 3), bellyMat);
-        bellyPlate.rotation.y = Math.PI / 2;
-        seg.add(bellyPlate);
+    headGroup.add(earGroup);
+  });
 
-        // 兩側裝飾毒鱗
-        if (i % 2 === 0) {
-          const sc1 = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 4), scalePatternMat);
-          sc1.rotation.z = Math.PI / 2;
-          sc1.position.set(rad * 0.95, 0, 0);
-          const sc2 = sc1.clone();
-          sc2.rotation.z = -Math.PI / 2;
-          sc2.position.set(-rad * 0.95, 0, 0);
-          seg.add(sc1); seg.add(sc2);
-        }
+  bodyGroup.add(headGroup);
 
-        // S 型昂首曲線
-        const waveX = Math.sin(t * Math.PI * 2.2) * 1.1;
-        const waveZ = -t * 8.5;
-        const heightY = 0.5 + Math.sin(t * Math.PI * 0.9) * 4.8;
-        seg.position.set(waveX, heightY, waveZ);
-        seg.rotation.x = 0.35 - t * 0.5;
-        seg.rotation.z = Math.cos(t * Math.PI * 2.2) * 0.25;
-        group.add(seg);
-      }
+  // ============== LIMBS (四肢) ==============
+  // 前腿 (較細，帶肩關節)
+  const frontLegPositions = [
+    [-0.95, 1.05, 1.5, 'FrontLeg_L'],
+    [0.95, 1.05, 1.5, 'FrontLeg_R']
+  ];
+  // 後腿 (較粗壯，帶髖關節)
+  const backLegPositions = [
+    [-0.95, 1.15, -1.35, 'BackLeg_L'],
+    [0.95, 1.15, -1.35, 'BackLeg_R']
+  ];
 
-      // 2. 威嚴毒蛇巨首 (三角蛇頭)
-      const headGroup = new THREE.Group();
-      headGroup.position.set(0, 5.4, 1.2);
+  const allLegs = [
+    ...frontLegPositions.map(p => ({ ...p, legHeight: 1.5, legRadius: 0.36, name: p[3] })),
+    ...backLegPositions.map(p => ({ ...p, legHeight: 1.7, legRadius: 0.48, name: p[3] }))
+  ];
 
-      // 上顎三角頭蓋
-      const headTop = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.8, 5), emeraldMat);
-      headTop.rotation.x = -Math.PI / 2 + 0.15;
-      headTop.scale.set(1.1, 0.65, 1.0);
-      headTop.castShadow = true;
-      headGroup.add(headTop);
+  allLegs.forEach(legData => {
+    const { x, y, z, name, legHeight, legRadius } = legData;
 
-      // 下顎
-      const jaw = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.4, 5), bellyMat);
-      jaw.rotation.x = -Math.PI / 2 - 0.1;
-      jaw.position.set(0, -0.4, -0.2);
-      jaw.scale.set(0.9, 0.45, 0.9);
-      headGroup.add(jaw);
+    const legGroup = new THREE.Group();
+    legGroup.name = name;
+    legGroup.position.set(x, y, z);
 
-      // 華麗蛇冠（眼鏡王蛇扇骨翼）
-      const hoodGeo = new THREE.CylinderGeometry(0.2, 2.4, 2.0, 16, 1, false, -Math.PI / 2, Math.PI);
-      const hood = new THREE.Mesh(hoodGeo, crestMat);
-      hood.rotation.x = 0.35;
-      hood.position.set(0, -0.6, -1.0);
-      headGroup.add(hood);
+    // 大腿/主腿（圓柱）
+    const upperLegGeo = new THREE.CylinderGeometry(legRadius, legRadius * 0.9, legHeight * 0.6, 14);
+    const upperLeg = new THREE.Mesh(upperLegGeo, matFur);
+    upperLeg.name = `${name}_Upper`;
+    upperLeg.position.y = -legHeight * 0.3;
+    upperLeg.castShadow = true;
+    legGroup.add(upperLeg);
 
-      // 毒牙 (兩枚尖利白牙)
-      const f1 = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.65, 6), fangMat);
-      f1.rotation.x = Math.PI * 0.85;
-      f1.position.set(-0.55, -0.25, 1.1);
-      const f2 = f1.clone();
-      f2.position.set(0.55, -0.25, 1.1);
-      headGroup.add(f1); headGroup.add(f2);
+    // 小腿（較細）
+    const lowerLegGeo = new THREE.CylinderGeometry(legRadius * 0.85, legRadius * 0.7, legHeight * 0.5, 14);
+    const lowerLeg = new THREE.Mesh(lowerLegGeo, matFur);
+    lowerLeg.name = `${name}_Lower`;
+    lowerLeg.position.y = -legHeight * 0.8;
+    lowerLeg.castShadow = true;
+    legGroup.add(lowerLeg);
 
-      // 吐信 (分叉紅舌)
-      const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 1.6), tongueMat);
-      tongue.position.set(0, -0.3, 2.0);
-      const tip1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.5), tongueMat);
-      tip1.rotation.y = 0.4;
-      tip1.position.set(-0.12, 0, 0.9);
-      const tip2 = tip1.clone();
-      tip2.rotation.y = -0.4;
-      tip2.position.set(0.12, 0, 0.9);
-      tongue.add(tip1); tongue.add(tip2);
-      headGroup.add(tongue);
+    // 爪墊 (米色腳掌)
+    const pawGeo = new THREE.SphereGeometry(legRadius * 1.1, 12, 10);
+    const paw = new THREE.Mesh(pawGeo, matBelly);
+    paw.name = `${name}_Paw`;
+    paw.scale.set(1.1, 0.5, 1.3);
+    paw.position.set(0, -legHeight, 0.05);
+    legGroup.add(paw);
 
-      // 陰森立體豎瞳金眼 (左右斜睨)
-      [-0.88, 0.88].forEach(x => {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), eyeMat);
-        eye.position.set(x, 0.25, 0.45);
-        const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.26), pupilMat);
-        pupil.position.set(x * 1.02, 0.25, 0.55);
-        headGroup.add(eye);
-        headGroup.add(pupil);
-      });
+    // 爪縫線
+    const clawSplitGeo = new THREE.BoxGeometry(0.05, 0.08, 0.35);
+    const clawSplit = new THREE.Mesh(clawSplitGeo, matDarkDetail);
+    clawSplit.name = `${name}_Claw_Split`;
+    clawSplit.position.set(0, -legHeight + 0.05, 0.28);
+    legGroup.add(clawSplit);
 
-      group.add(headGroup);
-      group.scale.set(1.4, 1.4, 1.4);
-      return group;
+    // 腿根斑點
+    const legSpotGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.05, 8);
+    [-0.05, 0.15].forEach(offsetY => {
+      const legSpot = new THREE.Mesh(legSpotGeo, matRosette);
+      legSpot.position.set(legRadius * 0.98, -legHeight * 0.2 + offsetY, 0);
+      legSpot.rotation.z = Math.PI / 2;
+      legGroup.add(legSpot);
+    });
+
+    bodyGroup.add(legGroup);
+  });
+
+  // ============== TAIL (獵豹長尾) ==============
+  const tailGroup = new THREE.Group();
+  tailGroup.name = 'Tail';
+  tailGroup.position.set(0, 2.2, -2.2);
+
+  // 尾部三節漸細
+  const tailSeg1Geo = new THREE.CylinderGeometry(0.28, 0.22, 1.1, 12);
+  const tailSeg1 = new THREE.Mesh(tailSeg1Geo, matFur);
+  tailSeg1.name = 'Tail_Seg1';
+  tailSeg1.rotation.x = Math.PI / 3;
+  tailSeg1.position.set(0, 0.4, -0.3);
+  tailGroup.add(tailSeg1);
+
+  const tailSeg2Geo = new THREE.CylinderGeometry(0.22, 0.16, 0.9, 12);
+  const tailSeg2 = new THREE.Mesh(tailSeg2Geo, matFur);
+  tailSeg2.name = 'Tail_Seg2';
+  tailSeg2.rotation.x = Math.PI / 3 - 0.15;
+  tailSeg2.position.set(0, 0.95, -1.1);
+  tailGroup.add(tailSeg2);
+
+  const tailSeg3Geo = new THREE.CylinderGeometry(0.16, 0.08, 0.8, 12);
+  const tailSeg3 = new THREE.Mesh(tailSeg3Geo, matFur);
+  tailSeg3.name = 'Tail_Seg3';
+  tailSeg3.rotation.x = Math.PI / 3 - 0.25;
+  tailSeg3.position.set(0, 1.4, -1.8);
+  tailGroup.add(tailSeg3);
+
+  // 尾尖黑環（獵豹尾尖經典黑色）
+  const tailTipGeo = new THREE.CylinderGeometry(0.12, 0.08, 0.25, 10);
+  const tailTip = new THREE.Mesh(tailTipGeo, matRosette);
+  tailTip.name = 'Tail_Tip_Black';
+  tailTip.rotation.x = Math.PI / 3 - 0.3;
+  tailTip.position.set(0, 1.7, -2.15);
+  tailGroup.add(tailTip);
+
+  // 尾巴中段斑點
+  [-0.2, 0.3].forEach(offsetY => {
+    const tailSpotGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.04, 6);
+    const tailSpot = new THREE.Mesh(tailSpotGeo, matRosette);
+    tailSpot.position.set(0.24, offsetY + 0.6, -0.6);
+    tailSpot.rotation.z = Math.PI / 2;
+    tailGroup.add(tailSpot);
+  });
+
+  bodyGroup.add(tailGroup);
+
+  root.add(bodyGroup);
+  root.scale.set(1.4, 1.4, 1.4); // 主體 Boss 縮放
+
+  return root;
     }
 
     function createMinionModel() {
@@ -1399,77 +1520,98 @@
         // ==========================================
     // 2.6 牛來 3D 軍團士兵與敵方牛來工廠
     // ==========================================
-        // ==========================================
-    // 2.6 全面還原 3D「牛來」士兵與敵怪工廠 (100% 原版模具)
+            // ==========================================
+    // 2.6 全面恢復 100% 深度還原 3D「牛來」士兵與「衝鋒獵豹」工廠
     // ==========================================
-        // ==========================================
-    // 2.6 高性能 LOD 小怪與士兵 3D 模具 (大幅降低 Draw Call，絲滑 60FPS)
-    // ==========================================
-    const SHARED_MATS = {
-      furGold: new THREE.MeshLambertMaterial({ color: 0xee9b00 }),
-      snoutWhite: new THREE.MeshLambertMaterial({ color: 0xfdfaf7 }),
-      cowYellow: new THREE.MeshLambertMaterial({ color: 0xe0a62f }),
-      cowSnout: new THREE.MeshLambertMaterial({ color: 0xc2a1af }),
-      cowHorn: new THREE.MeshLambertMaterial({ color: 0x3a3536 }),
-      eyeWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-      eyeBlack: new THREE.MeshBasicMaterial({ color: 0x000000 }),
-      redEnemy: new THREE.MeshLambertMaterial({ color: 0xdc2626 }),
-      darkRedEnemy: new THREE.MeshLambertMaterial({ color: 0x991b1b }),
-      blueSoldier: new THREE.MeshLambertMaterial({ color: 0x1d4ed8 }),
-      bowMat: new THREE.MeshLambertMaterial({ color: 0xd97706 }),
-      shieldMat: new THREE.MeshLambertMaterial({ color: 0x475569 })
-    };
+    // 快取幾何模板，避免每隻怪重複解析，既保有極致細節又極度流暢
+    let _cachedNiulaiTemplate = null;
+    let _cachedLeopardTemplate = null;
+
+    function getNiulaiTemplate() {
+      if (!_cachedNiulaiTemplate) {
+        _cachedNiulaiTemplate = createNiulaiCowModel();
+      }
+      return _cachedNiulaiTemplate;
+    }
+
+    function getLeopardTemplate() {
+      if (!_cachedLeopardTemplate) {
+        _cachedLeopardTemplate = createLeopardBossModel();
+      }
+      return _cachedLeopardTemplate;
+    }
 
     function createMiniLeopardModel(mobType = 'normal') {
-      const g = new THREE.Group();
-      // 1. 軀幹
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.8), SHARED_MATS.furGold);
-      body.position.y = 0.5;
-      g.add(body);
-
-      // 2. 頭部
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.65, 0.75), SHARED_MATS.furGold);
-      head.position.set(0, 0.85, 0.85);
-      g.add(head);
-
-      // 3. 口吻
-      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.35), SHARED_MATS.snoutWhite);
-      snout.position.set(0, 0.7, 1.25);
-      g.add(snout);
-
-      // 4. 耳朵
-      const earL = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 4), SHARED_MATS.furGold);
-      earL.position.set(-0.3, 1.25, 0.8);
-      const earR = earL.clone();
-      earR.position.set(0.3, 1.25, 0.8);
-      g.add(earL); g.add(earR);
-
-      // 5. 眼睛
-      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.05), SHARED_MATS.eyeBlack);
-      eyeL.position.set(-0.2, 0.92, 1.24);
-      const eyeR = eyeL.clone();
-      eyeR.position.set(0.2, 0.92, 1.24);
-      g.add(eyeL); g.add(eyeR);
-
-      // 6. 尾巴
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 1.1, 6), SHARED_MATS.furGold);
-      tail.position.set(0, 0.8, -1.1);
-      tail.rotation.x = Math.PI / 3;
-      g.add(tail);
+      // 100% 採用狂暴獵豹完整 3D 模具（含豹斑、花紋、長尾、利爪、利齒立體口鼻）
+      const template = getLeopardTemplate();
+      const group = template.clone(true);
+      group.name = "Mini_Leopard_" + mobType;
+      group.scale.set(0.48, 0.48, 0.48); // 縮放為小怪尺寸
+      group.rotation.y = Math.PI; // 面向玩家衝殺
 
       if (mobType === 'shield') {
-        const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.12), SHARED_MATS.shieldMat);
-        shield.position.set(0, 0.8, 1.4);
-        g.add(shield);
+        const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
+        const shield = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.0, 0.2), shieldMat);
+        shield.position.set(0, 1.8, 2.2);
+        group.add(shield);
+      }
+      return group;
+    }
+
+    function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
+      // 100% 採用原版跳一跳「牛來」完整精緻 3D 模具（含死魚眼、挑眉、肉吻、牛角、牛蹄）
+      const template = getNiulaiTemplate();
+      const cow = template.clone(true);
+      cow.scale.set(0.42, 0.42, 0.42);
+
+      if (isEnemy) {
+        cow.rotation.y = Math.PI; // 面向玩家軍團
+        cow.traverse(child => {
+          if (child.isMesh && child.material) {
+            if (child.name === 'Torso' || child.name === 'Belly' || (child.material.name === 'Yellow_Fur' || child.material.name === 'Fur_Belly')) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: mobType === 'shield' ? 0x991b1b : (mobType === 'fast' ? 0xdc2626 : 0xb91c1c),
+                roughness: 0.7
+              });
+            }
+          }
+        });
+
+        if (mobType === 'shield') {
+          const shieldMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 });
+          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.15), shieldMat);
+          shield.position.set(0, 1.2, 0.65);
+          cow.add(shield);
+        } else if (mobType === 'fast') {
+          const giantHorn = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+          giantHorn.position.set(0, 3.1, 0);
+          cow.add(giantHorn);
+        }
+      } else {
+        cow.traverse(child => {
+          if (child.isMesh && (child.name === 'Torso' || child.material.name === 'Yellow_Fur')) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0x1d4ed8, // 友方藍色戰袍
+              roughness: 0.6
+            });
+          }
+        });
+
+        // 友方戰弓
+        const bowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 });
+        const bow = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 12, Math.PI), bowMat);
+        bow.position.set(0.7, 0.9, -0.3);
+        bow.rotation.y = Math.PI / 2;
+        bow.rotation.z = Math.PI / 2;
+        cow.add(bow);
       }
 
-      g.scale.set(0.65, 0.65, 0.65);
-      g.rotation.y = Math.PI; // 面向玩家衝殺
-      return g;
+      return cow;
     }
 
     function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
       const g = new THREE.Group();
+      g.userData.loShadow = true; // V10: 士兵不投射 shadow
 
       const skinMat = isEnemy ? (mobType === 'shield' ? SHARED_MATS.darkRedEnemy : SHARED_MATS.redEnemy) : SHARED_MATS.cowYellow;
       const uniformMat = isEnemy ? SHARED_MATS.darkRedEnemy : SHARED_MATS.blueSoldier;
@@ -2179,10 +2321,11 @@
 
       update(now) {
         if (!this.active) return;
+        this.game.performance.frameIndex = (this.game.performance.frameIndex || 0) + 1;
 
         // 1. 部隊向前推進（如果還未進入 Boss 決戰死斗場）
         if (!this.bossStageActive) {
-          this.worldZ += this.marchSpeed;
+          this.worldZ += this.marchSpeed * (delta / (1/60));
           this.soldierGroup.position.z = -this.worldZ;
           this.camera.position.z = -this.worldZ + 24;
 
@@ -2212,11 +2355,14 @@
         this.soldierGroup.position.x = this.armyCenterX;
         this.camera.position.x = this.armyCenterX * 0.35;
 
-        // 士兵集體踏步動態
-        const marchTime = now * 0.012;
-        this.soldiers.forEach((s, idx) => {
-          s.position.y = Math.abs(Math.sin(marchTime + idx * 0.3)) * 0.12;
-        });
+        // 士兵集體踏步動態 (V10: 近距離才動畫)
+        if (this.soldiers.length < 80) {
+          const marchTime = now * 0.012;
+          for (let i = 0; i < this.soldiers.length; i++) {
+            this.soldiers[i].position.y = Math.abs(Math.sin(marchTime + i * 0.3)) * 0.12;
+          }
+          this.game.performance.animatedTickCount += this.soldiers.length;
+        }
 
         // 3. 旋轉武器玻璃球內的核心
         this.decisionSections.forEach(d => {
@@ -2358,6 +2504,7 @@
           const distX = Math.abs(e.group.position.x - this.armyCenterX);
 
           // 只有當敵怪正面衝撞進軍團方陣半徑內
+          this.game.performance.collisionCheckCount++;
           if (distZ < 1.0 && distX < armyRadius + 0.5) {
             const lost = e.isMiniBoss ? 2 : 1;
             this.armyCount = Math.max(0, this.armyCount - lost);
@@ -2378,22 +2525,63 @@
           }
         }
 
-        // 所有敵怪（普通兵、盾兵、疾跑兵、小Boss）都大步迎面主動衝鋒！
+        // ========== V10: 基於 Delta Time 的 AI + 分層 Throttling ==========
+        const delta = this.game.currentDelta || 0.016;
         const nowMs = performance.now();
         const curArmyZ = -this.worldZ;
-        for (let e of this.enemies) {
-          const distToArmy = Math.abs(e.group.position.z - curArmyZ);
-          if (distToArmy > 120) continue;
+        const cullDistSq = 130 * 130;
+
+        for (let i = 0; i < this.enemies.length; i++) {
+          const e = this.enemies[i];
+
+          // V10: 距離 culling 用平方距離，避免 Math.sqrt
+          const dx = e.group.position.x - this.armyCenterX;
+          const dz = e.group.position.z - curArmyZ;
+          const distSq = dx * dx + dz * dz;
+
+          // 遠距離 (>130) 完全不更新 AI/動畫
+          if (distSq > cullDistSq) {
+            e.group.visible = false;
+            continue;
+          }
+          e.group.visible = true;
 
           const isFrozen = e.frozenUntil && e.frozenUntil > nowMs;
-          if (!isFrozen && e.moveSpeed) {
-            e.group.position.z += e.moveSpeed; // 大步朝玩家衝擊！
-            e.group.position.y = 0.5 + Math.abs(Math.sin(now * 0.015 + e.group.position.z)) * 0.12;
+          if (isFrozen) continue;
+
+          // V10: AI Tick Throttling
+          // 距離 <20m: 每幀更新 (60Hz)
+          // 距離 20~60m: 每 2 幀更新 (30Hz)
+          // 距離 60m+: 每 4 幀更新 (15Hz)
+          const dist = Math.sqrt(distSq);
+          let aiThrottle = 1;
+          if (dist > 60) aiThrottle = 4;
+          else if (dist > 20) aiThrottle = 2;
+
+          this.game.performance.aiTickCount++;
+
+          // 遠距離怪跳過本幀動畫但保留位置邏輯
+          if (aiThrottle > 1 && (this.game.performance.frameIndex % aiThrottle) !== 0) {
+            // 只移動，不做複雜動畫
+            e.group.position.z += e.moveSpeed * 60 * delta; // 60fps 基準的單位速度
+            continue;
           }
+
+          // V10: 統一用 units/second × delta
+          e.group.position.z += e.moveSpeed * 60 * delta; // 大步朝玩家衝擊！
+          this.game.performance.animatedTickCount++;
+
+          // 踏步動畫 (只有近距離完整動畫)
+          if (dist < 40) {
+            e.group.position.y = 0.5 + Math.abs(Math.sin(now * 0.015 + e.group.position.z)) * 0.12;
+          } else {
+            e.group.position.y = 0.5; // 遠距離固定高度
+          }
+
           if (e.type === 'active_miniboss') {
-            if (!isFrozen) e.group.position.x = Math.sin(now * 0.003 + e.z) * 2.6;
-          } else if (e.type === 'fast') {
-            if (!isFrozen) e.group.position.x += Math.sin(now * 0.008 + e.group.position.z) * 0.09;
+            e.group.position.x = Math.sin(now * 0.003 + e.z) * 2.6;
+          } else if (e.type === 'fast' && dist < 30) {
+            e.group.position.x += Math.sin(now * 0.008 + e.group.position.z) * 0.09;
           }
         }
 
@@ -2772,6 +2960,21 @@
         this.blockFactory = new BlockFactory();
         this.lordShooter = new ArmyArcherSiege(this);
 
+        // ========== V10 Delta Time + Performance Tracker ==========
+        this.clock = new THREE.Clock();
+        this.performance = {
+          frameCount: 0,
+          fpsAccum: 0,
+          fpsTimeAccum: 0,
+          lastFpsUpdate: 0,
+          cpuTimeAccum: 0,
+          lastCpuUpdate: 0,
+          aiTickCount: 0,
+          collisionCheckCount: 0,
+          animatedTickCount: 0,
+          lastHudUpdate: 0
+        };
+
 
         this.initThree();
         this.initLights();
@@ -2781,7 +2984,24 @@
         this.updateUI();
 
         this.animate = this.animate.bind(this);
+        this.clock.start();
         requestAnimationFrame(this.animate);
+
+        // ========== V10 Perf HUD updater ==========
+        this.perfHudEl = document.getElementById('perf-hud');
+        this.hudFps = document.getElementById('hud-fps');
+        this.hudFrame = document.getElementById('hud-frame');
+        this.hudCpu = document.getElementById('hud-cpu');
+        this.hudDc = document.getElementById('hud-dc');
+        this.hudTri = document.getElementById('hud-tri');
+        this.hudGeo = document.getElementById('hud-geo');
+        this.hudTex = document.getElementById('hud-tex');
+        this.hudMon = document.getElementById('hud-mon');
+        this.hudAnim = document.getElementById('hud-anim');
+        this.hudAi = document.getElementById('hud-ai');
+        this.hudCol = document.getElementById('hud-col');
+        this.hudPr = document.getElementById('hud-pr');
+        this.hudShadow = document.getElementById('hud-shadow');
       }
 
       initThree() {
@@ -2800,12 +3020,17 @@
         this.camera.lookAt(0, 1.5, 0);
         this.cameraTarget = new THREE.Vector3(0, 1.5, 0);
 
-        // 渲染器
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        // 渲染器 V10 優化：限制 Pixel Ratio + 廉價 Shadow 算法
+        this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        // V10: 手機上限從 2 降到 1.25，桌面 1.5，避免高 DPI 手機產生 9x 像素
+        const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+        this.pixelRatioCap = isMobile ? 1.25 : 1.5;
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.pixelRatioCap));
+        // V10: 只保留主角 shadow，PCF (VSM 更貴)，shadow map 從 2048 降到 1024
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.type = THREE.PCFShadowMap;
+        this.renderer.shadowMap.autoUpdate = true;
         this.container.appendChild(this.renderer.domElement);
 
         window.addEventListener('resize', () => {
@@ -2828,8 +3053,8 @@
         this.dirLight = new THREE.DirectionalLight(0xfff8ee, 0.75);
         this.dirLight.position.set(14, 25, 10);
         this.dirLight.castShadow = true;
-        this.dirLight.shadow.mapSize.width = 2048;
-        this.dirLight.shadow.mapSize.height = 2048;
+        this.dirLight.shadow.mapSize.width = 1024;
+        this.dirLight.shadow.mapSize.height = 1024;
         this.dirLight.shadow.camera.near = 1;
         this.dirLight.shadow.camera.far = 60;
         const size = 15;
@@ -3265,6 +3490,23 @@
 
       animate(now) {
         requestAnimationFrame(this.animate);
+
+        // ========== V10: Delta Time + CPU 計時 ==========
+        const perfStart = performance.now();
+        let delta = this.clock.getDelta();
+        if (delta > 0.05) delta = 0.05; // 防止卡頓後瞬移
+        this.currentDelta = delta;
+
+        // 統計 FPS 與 CPU 時間
+        this.performance.frameCount++;
+        this.performance.fpsTimeAccum += delta;
+        if (now - this.performance.lastFpsUpdate > 500) {
+          const fps = Math.round(this.performance.frameCount / this.performance.fpsTimeAccum);
+          this.currentFps = fps;
+          this.performance.frameCount = 0;
+          this.performance.fpsTimeAccum = 0;
+          this.performance.lastFpsUpdate = now;
+        }
 
         // 待機小牛微呼吸
         const ud = this.cow.userData;
