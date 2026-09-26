@@ -1609,70 +1609,7 @@
       return cow;
     }
 
-    function createNiulaiSoldierModel(colorHex = 0x1d4ed8, isEnemy = false, mobType = 'normal') {
-      const g = new THREE.Group();
-      g.userData.loShadow = true; // V10: 士兵不投射 shadow
-
-      const skinMat = isEnemy ? (mobType === 'shield' ? SHARED_MATS.darkRedEnemy : SHARED_MATS.redEnemy) : SHARED_MATS.cowYellow;
-      const uniformMat = isEnemy ? SHARED_MATS.darkRedEnemy : SHARED_MATS.blueSoldier;
-
-      // 1. 軀幹
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.7, 10), uniformMat);
-      body.position.y = 0.35;
-      g.add(body);
-
-      // 2. 圓萌牛頭
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), skinMat);
-      head.position.y = 0.95;
-      g.add(head);
-
-      // 3. 標誌肉吻
-      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.25), SHARED_MATS.cowSnout);
-      snout.position.set(0, 0.88, isEnemy ? 0.25 : -0.25);
-      g.add(snout);
-
-      // 4. 牛角
-      const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.28, 5), SHARED_MATS.cowHorn);
-      hornL.position.set(-0.24, 1.25, 0);
-      hornL.rotation.z = 0.35;
-      const hornR = hornL.clone();
-      hornR.position.set(0.24, 1.25, 0);
-      hornR.rotation.z = -0.35;
-      g.add(hornL); g.add(hornR);
-
-      // 5. 厭世死魚眼
-      const faceZ = isEnemy ? 0.3 : -0.3;
-      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.04), SHARED_MATS.eyeWhite);
-      eyeL.position.set(-0.14, 1.02, faceZ);
-      const pupilL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.05), SHARED_MATS.eyeBlack);
-      pupilL.position.set(-0.14, 1.02, faceZ + (isEnemy ? 0.02 : -0.02));
-      g.add(eyeL); g.add(pupilL);
-
-      const eyeR = eyeL.clone(); eyeR.position.x = 0.14;
-      const pupilR = pupilL.clone(); pupilR.position.x = 0.14;
-      g.add(eyeR); g.add(pupilR);
-
-      if (!isEnemy) {
-        // 戰弓
-        const bow = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.035, 5, 10, Math.PI), SHARED_MATS.bowMat);
-        bow.position.set(0.4, 0.55, -0.2);
-        bow.rotation.y = Math.PI / 2;
-        bow.rotation.z = Math.PI / 2;
-        g.add(bow);
-      } else {
-        g.rotation.y = Math.PI;
-        if (mobType === 'shield') {
-          const shield = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.95, 0.12), SHARED_MATS.shieldMat);
-          shield.position.set(0, 0.55, 0.45);
-          g.add(shield);
-        }
-      }
-
-      g.scale.set(0.62, 0.62, 0.62);
-      return g;
-    }
-
-    // ==========================================
+        // ==========================================
     // 2.7 《最強領主：軍團攻城齊射》
     class ArmyArcherSiege {
       constructor(game) {
@@ -2321,6 +2258,7 @@
 
       update(now) {
         if (!this.active) return;
+        const delta = this.game.currentDelta || 0.016;
         this.game.performance.frameIndex = (this.game.performance.frameIndex || 0) + 1;
 
         // 1. 部隊向前推進（如果還未進入 Boss 決戰死斗場）
@@ -2526,7 +2464,6 @@
         }
 
         // ========== V10: 基於 Delta Time 的 AI + 分層 Throttling ==========
-        const delta = this.game.currentDelta || 0.016;
         const nowMs = performance.now();
         const curArmyZ = -this.worldZ;
         const cullDistSq = 130 * 130;
@@ -3559,6 +3496,38 @@
         } else {
           // 跳一跳主場景渲染
           this.renderer.render(this.scene, this.camera);
+        }
+
+        // ========== V10 HUD 實時數值更新 (低頻節流 5Hz) ==========
+        if (this.perfHudEl && now - (this.performance.lastHudUpdate || 0) > 200) {
+          this.performance.lastHudUpdate = now;
+          const cpuMs = (performance.now() - perfStart).toFixed(1);
+          const frameMs = (delta * 1000).toFixed(1);
+          const info = this.renderer.info;
+
+          if (this.hudFps) this.hudFps.textContent = this.currentFps || '--';
+          if (this.hudFrame) this.hudFrame.textContent = `${frameMs} ms`;
+          if (this.hudCpu) this.hudCpu.textContent = `${cpuMs} ms`;
+          if (this.hudDc) this.hudDc.textContent = info.render.calls;
+          if (this.hudTri) this.hudTri.textContent = (info.render.triangles / 1000).toFixed(1) + 'k';
+          if (this.hudGeo) this.hudGeo.textContent = info.memory.geometries;
+          if (this.hudTex) this.hudTex.textContent = info.memory.textures;
+          if (this.hudPr) this.hudPr.textContent = this.renderer.getPixelRatio();
+
+          if (this.state === 'IN_LORD' && this.lordShooter) {
+            if (this.hudMon) this.hudMon.textContent = this.lordShooter.enemies.length;
+            if (this.hudAnim) this.hudAnim.textContent = this.performance.animatedTickCount || 0;
+            if (this.hudAi) this.hudAi.textContent = this.performance.aiTickCount || 0;
+            if (this.hudCol) this.hudCol.textContent = this.performance.collisionCheckCount || 0;
+          } else {
+            if (this.hudMon) this.hudMon.textContent = 0;
+            if (this.hudAnim) this.hudAnim.textContent = 1;
+            if (this.hudAi) this.hudAi.textContent = 0;
+            if (this.hudCol) this.hudCol.textContent = 0;
+          }
+          this.performance.aiTickCount = 0;
+          this.performance.animatedTickCount = 0;
+          this.performance.collisionCheckCount = 0;
         }
       }
     }
