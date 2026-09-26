@@ -438,6 +438,7 @@
 
     /* Debug Performance HUD */
     #perf-hud {
+      display: none !important; /* 隱藏調試 HUD 窗口 */
       position: fixed;
       top: 4px;
       right: 4px;
@@ -1914,16 +1915,19 @@
       }
 
       spawnMobBatch(count, zPos, mobType, hp, moveSpeed = 0.36) {
-        // 數量增加 3 倍！
-        const tripleCount = Math.floor(count * 3);
-        for (let i = 0; i < tripleCount; i++) {
+        // 怪物海暴增：大幅提升怪潮密度 (6 倍兵力，真正千軍萬馬割草衝擊！)
+        const totalMobs = Math.floor(count * 6);
+        for (let i = 0; i < totalMobs; i++) {
           // 隨機混合：50% 3D 敵方牛來，50% 3D 衝鋒獵豹！
           const isLeopard = Math.random() > 0.5;
           const g = isLeopard ? createMiniLeopardModel(mobType) : createNiulaiSoldierModel(0xdc2626, true, mobType);
 
-          const spread = Math.min(13, tripleCount * 0.85);
-          const x = (i - (tripleCount - 1) / 2) * (spread / Math.max(1, tripleCount - 1)) + (Math.random() - 0.5) * 0.4;
-          const staggerZ = zPos + (Math.random() - 0.5) * 4.0;
+          // 戰場橫向 14 寬度密集鋪開，縱向分 4~5 排前後錯落梯次衝鋒
+          const laneSpread = 13.6;
+          const col = i % 8;
+          const row = Math.floor(i / 8);
+          const x = (col - 3.5) * (laneSpread / 7.5) + (Math.random() - 0.5) * 0.6;
+          const staggerZ = zPos - row * 2.2 + (Math.random() - 0.5) * 1.2;
           g.position.set(x, 0, staggerZ);
           this.scene.add(g);
 
